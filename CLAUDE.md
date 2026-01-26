@@ -255,17 +255,19 @@ MediaPipe's native Z coordinate is unreliable for depth (it's relative to head c
 ### ErrorBoundary.tsx (57 lines)
 React Error Boundary to catch unhandled errors and display a user-friendly error screen with reload button.
 
-### HUD.tsx - Camera Position Debug Box
-The HUD includes a **Camera Position Debug Box** in the top-right corner that displays real-time camera coordinates:
-- **X, Y, Z**: Current camera position in 3D space
-- **Look At**: The target point the camera is facing
+### HUD.tsx - Camera Position Control Box
+The HUD includes a **Camera Position Control Box** in the top-right corner that displays and allows editing of real-time camera coordinates:
+- **X, Y, Z**: Current camera position in 3D space (editable)
+- **Look At**: The target point the camera is facing (editable)
 
-This is useful for:
-- Calibrating default camera positions
-- Debugging scene visibility issues
-- Understanding how head tracking affects camera position
+**Features:**
+- **Editable inputs**: Click to edit values directly without live updates overwriting your input
+- **Arrow key support**: Use Up/Down arrows to increment/decrement values by 0.1
+- **Enter to apply**: Press Enter to apply changes immediately
+- **Escape to cancel**: Press Escape to revert to current value
+- Auto-hides with the rest of the HUD controls after 3 seconds of inactivity
 
-The debug box auto-hides with the rest of the HUD controls after 3 seconds of inactivity.
+The `EditableNumberInput` component maintains local state while focused, preventing the live camera position updates from overwriting user input mid-edit.
 
 **Data Flow:**
 ```typescript
@@ -279,8 +281,15 @@ export interface CameraPositionData {
 <SplatViewer onCameraPositionUpdate={setCameraPosition} />
 
 // App.tsx threads position to HUD
-<HUDOverlay cameraPosition={cameraPosition} />
+<HUDOverlay cameraPosition={cameraPosition} onSetCameraPosition={...} />
 ```
+
+### CalibrationWizard.tsx
+The calibration wizard appears in head tracking mode below the camera position box (`top: 290px`) to avoid overlap. Shows:
+- Progress bar during 30-frame baseline calibration
+- "Hold still" instruction while calibrating
+- "Calibrated" checkmark when complete
+- Recalibrate button to reset baseline
 
 ---
 
@@ -304,6 +313,12 @@ Your screen acts as a virtual window into a 3D scene. The webcam tracks your hea
 ### Head Tracking Parameters
 
 Sliders show **real values** with ranges designed so **defaults sit at ~50%** (the middle). This helps users understand "normal" values and how much to adjust. All sliders support direct text input for precise control.
+
+**Slider Features:**
+- **Info tooltips**: Each slider has a `?` button that shows a description on hover/click explaining what the parameter does
+- **Direct text input**: Click the numeric field to type exact values
+- **Semantic labels**: Min/max labels like "Subtle" / "Dramatic" where appropriate
+- **Auto-save**: Changes persist immediately via Zustand store
 
 #### Motion Parameters (Calibrated January 2025)
 | Parameter | Default | Range | Description |
@@ -629,6 +644,11 @@ server: {
 | Slider precision too coarse | `App.tsx` | **FIXED** - Changed to 0.01 step with text input |
 | **Progress stuck at 80%** | `server/main.py` | **FIXED** - Changed to asymptotic progress curve that never exceeds 79% until SHARP completes |
 | **LimitOverrunError on long output** | `server/main.py` | **FIXED** - Replaced `readline()` with chunked `read()` to handle SHARP output >64KB |
+| **Camera inputs overwritten while typing** | `HUD.tsx` | **FIXED** - `EditableNumberInput` maintains local state while focused |
+| **Calibration wizard overlapping camera box** | `CalibrationWizard.tsx` | **FIXED** - Moved to `top: 290px` below camera position box |
+| **PLY camera position wrong on load** | `SplatViewer.tsx` | **FIXED** - Camera now at origin looking into negative Z where scene content is |
+| **Zoom/depth effect not working** | `SplatViewer.tsx` | **FIXED** - Removed hardcoded Z minimum, now uses dynamic bounds |
+| **Sliders lack context** | `Slider.tsx`, `SettingsPanel.tsx` | **FIXED** - Added info tooltip with `?` button explaining each parameter |
 
 ### Remaining Issues
 
@@ -724,8 +744,8 @@ self.crossOriginIsolated
 - **Animation Infrastructure**: Keyframe capture, interpolation, easing functions
 - **Calibration Wizard**: Visual feedback during head tracking calibration
 - **Settings Presets**: Subtle, Natural, Dramatic one-click presets
-- **Camera Position Debug Box**: Real-time display of camera X/Y/Z coordinates
-- **Slider UX Improvements**: All sliders show real values with defaults at ~50% of range, direct text input supported
+- **Camera Position Control Box**: Real-time display AND manual editing of camera X/Y/Z coordinates with `EditableNumberInput` component
+- **Slider UX Improvements**: All sliders show real values with defaults at ~50% of range, direct text input, info tooltips explaining each parameter
 - **Backend Job Management**: Cancel running jobs, status polling, result downloads
 - **Temp File Cleanup**: Automatic cleanup of old uploads/outputs
 
