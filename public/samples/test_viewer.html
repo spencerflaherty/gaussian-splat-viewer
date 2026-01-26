@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gaussian Splat Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; color: white; font-family: monospace; }
+        #container { width: 100vw; height: 100vh; }
+        #debug { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; z-index: 1000; }
+        #debug div { margin: 5px 0; }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .warning { color: #fbbf24; }
+        button { margin: 5px; padding: 8px 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="debug">
+        <h3>Gaussian Splat Viewer Test</h3>
+        <div id="status">Loading library...</div>
+        <div id="splat-count">Splats: -</div>
+        <div id="camera-pos">Camera: -</div>
+        <div id="scene-info">Scene: -</div>
+        <hr>
+        <button onclick="loadTestScene()">Load test_scene.ply</button>
+        <button onclick="loadTestSplat()">Load test_splat.ply</button>
+        <button onclick="loadSampleSplat()">Load sample_train.splat</button>
+    </div>
+    <div id="container"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "/node_modules/three/build/three.module.js",
+            "@mkkellogg/gaussian-splats-3d": "/node_modules/@mkkellogg/gaussian-splats-3d/build/gaussian-splats-3d.module.js"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+
+        const statusEl = document.getElementById('status');
+        const splatCountEl = document.getElementById('splat-count');
+        const cameraPosEl = document.getElementById('camera-pos');
+        const sceneInfoEl = document.getElementById('scene-info');
+
+        let viewer = null;
+
+        function log(msg, type = 'info') {
+            console.log(`[Test] ${msg}`);
+            statusEl.innerHTML = `<span class="${type}">${msg}</span>`;
+        }
+
+        function updateDebug() {
+            if (!viewer) return;
+
+            try {
+                const count = typeof viewer.getSplatCount === 'function' ? viewer.getSplatCount() : 0;
+                splatCountEl.textContent = `Splats: ${count.toLocaleString()}`;
+
+                if (viewer.camera) {
+                    const pos = viewer.camera.position;
+                    cameraPosEl.textContent = `Camera: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`;
+                }
+            } catch (e) {
+                console.warn('Debug update error:', e);
+            }
+        }
+
+        async function loadScene(url, format) {
+            log('Disposing previous viewer...', 'warning');
+
+            if (viewer) {
+                try {
+                    viewer.dispose();
+                } catch (e) {
+                    console.warn('Dispose error:', e);
+                }
+            }
+
+            document.getElementById('container').innerHTML = '';
+
+            log(`Creating viewer for ${url}...`, 'warning');
+
+            try {
+                viewer = new GaussianSplats3D.Viewer({
+                    'rootElement': document.getElementById('container'),
+                    'cameraUp': [0, 1, 0],
+                    'initialCameraPosition': [0, 0, 5],
+                    'initialCameraLookAt': [0, 0, 0],
+                    'selfDrivenMode': true,
+                    'useBuiltInControls': true,
+                    'sharedMemoryForWorkers': false,
+                    'gpuAcceleratedSort': true,
+                });
+
+                log('Viewer created, loading scene...', 'warning');
+                sceneInfoEl.textContent = `Scene: Loading ${url}...`;
+
+                const options = {
+                    'showLoadingUI': true,
+                    'splatAlphaRemovalThreshold': 1,
+                };
+
+                // Add format hint for PLY files
+                if (format === 'ply') {
+                    options['format'] = 2; // SceneFormat.Ply
+                } else if (format === 'splat') {
+                    options['format'] = 0; // SceneFormat.Splat
+                }
+
+                console.log('Loading with options:', options);
+
+                await viewer.addSplatScene(url, options);
+
+                log('Scene loaded! Starting viewer...', 'success');
+
+                viewer.start();
+
+                sceneInfoEl.textContent = `Scene: ${url} loaded`;
+                log('Viewer started!', 'success');
+
+                // Start debug loop
+                setInterval(updateDebug, 500);
+
+            } catch (err) {
+                log(`Error: ${err.message}`, 'error');
+                console.error('Full error:', err);
+                sceneInfoEl.textContent = `Scene: FAILED - ${err.message}`;
+            }
+        }
+
+        window.loadTestScene = () => loadScene('/test_scene.ply', 'ply');
+        window.loadTestSplat = () => loadScene('/test_splat.ply', 'ply');
+        window.loadSampleSplat = () => loadScene('/sample_train.splat', 'splat');
+
+        // Initial status
+        log('Library loaded. Click a button to load a scene.', 'success');
+    </script>
+</body>
+</html>
