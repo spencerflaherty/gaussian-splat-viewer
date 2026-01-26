@@ -40,6 +40,36 @@ export function DropZone({
   const [showManage, setShowManage] = useState(false);
   const [cleanupStatus, setCleanupStatus] = useState<string | null>(null);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<{
+    sharpModelMb: number;
+    tempFilesMb: number;
+    tempFileCount: number;
+    sharpInstalled: boolean;
+  } | null>(null);
+
+  // Fetch storage info when manage panel opens
+  const fetchStorageInfo = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/status/storage`);
+      const data = await response.json();
+      setStorageInfo({
+        sharpModelMb: data.sharp_model?.size_mb ?? 0,
+        tempFilesMb: data.temp_files?.size_mb ?? 0,
+        tempFileCount: data.temp_files?.file_count ?? 0,
+        sharpInstalled: data.sharp_model?.installed ?? false,
+      });
+    } catch {
+      setStorageInfo(null);
+    }
+  };
+
+  const toggleManage = () => {
+    const newState = !showManage;
+    setShowManage(newState);
+    if (newState && backendStatus === 'online') {
+      fetchStorageInfo();
+    }
+  };
 
   const handleCleanup = async (type: 'sharp-model' | 'temp-files' | 'all') => {
     setIsCleaningUp(true);
@@ -60,10 +90,12 @@ export function DropZone({
       } else {
         setCleanupStatus(data.freed_mb > 0 ? `Freed ${data.freed_mb}MB` : 'No temp files');
       }
-    } catch (err) {
+    } catch {
       setCleanupStatus('Cleanup failed - is the backend running?');
     } finally {
       setIsCleaningUp(false);
+      // Refresh storage info after cleanup
+      fetchStorageInfo();
       setTimeout(() => setCleanupStatus(null), 3000);
     }
   };
@@ -229,7 +261,7 @@ export function DropZone({
 
       {/* Manage Button (bottom right) */}
       <button
-        onClick={() => setShowManage(!showManage)}
+        onClick={toggleManage}
         style={{
           position: 'fixed',
           bottom: 20,
@@ -251,10 +283,34 @@ export function DropZone({
       {/* Manage Panel */}
       {showManage && (
         <div style={{ position: 'fixed', bottom: 60, right: 20 }}>
-          <LiquidGlass style={{ padding: 16, width: 280 }}>
+          <LiquidGlass style={{ padding: 16, width: 300 }}>
             <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 600, color: 'rgba(0,0,0,0.85)' }}>
               Storage Management
             </h3>
+
+            {/* Storage Info */}
+            {storageInfo && backendStatus === 'online' && (
+              <div style={{
+                padding: '10px 12px',
+                background: 'rgba(0, 0, 0, 0.03)',
+                borderRadius: 10,
+                marginBottom: 12,
+                fontSize: 12,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: 'rgba(0,0,0,0.5)' }}>SHARP Model:</span>
+                  <span style={{ fontWeight: 500, color: storageInfo.sharpInstalled ? '#FF9500' : 'rgba(0,0,0,0.4)' }}>
+                    {storageInfo.sharpInstalled ? `${storageInfo.sharpModelMb.toFixed(1)} MB` : 'Not installed'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'rgba(0,0,0,0.5)' }}>Temp Files:</span>
+                  <span style={{ fontWeight: 500, color: storageInfo.tempFileCount > 0 ? '#007AFF' : 'rgba(0,0,0,0.4)' }}>
+                    {storageInfo.tempFileCount > 0 ? `${storageInfo.tempFilesMb.toFixed(1)} MB (${storageInfo.tempFileCount} files)` : 'None'}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {cleanupStatus && (
               <p style={{
@@ -272,43 +328,43 @@ export function DropZone({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button
                 onClick={() => handleCleanup('sharp-model')}
-                disabled={isCleaningUp || backendStatus !== 'online'}
+                disabled={isCleaningUp || backendStatus !== 'online' || !storageInfo?.sharpInstalled}
                 style={{
                   padding: '10px 14px',
                   background: 'rgba(255, 149, 0, 0.1)',
                   border: 'none',
                   borderRadius: 10,
-                  color: backendStatus === 'online' ? '#FF9500' : 'rgba(0,0,0,0.3)',
+                  color: (backendStatus === 'online' && storageInfo?.sharpInstalled) ? '#FF9500' : 'rgba(0,0,0,0.3)',
                   fontSize: 13,
                   fontWeight: 500,
-                  cursor: backendStatus === 'online' ? 'pointer' : 'not-allowed',
+                  cursor: (backendStatus === 'online' && storageInfo?.sharpInstalled) ? 'pointer' : 'not-allowed',
                   textAlign: 'left',
                 }}
               >
-                Delete SHARP Model (~2.6GB)
+                Delete SHARP Model
                 <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
-                  Will re-download on next conversion
+                  {storageInfo?.sharpInstalled ? `${storageInfo.sharpModelMb.toFixed(1)} MB - will re-download on next use` : 'Model not installed'}
                 </span>
               </button>
 
               <button
                 onClick={() => handleCleanup('temp-files')}
-                disabled={isCleaningUp || backendStatus !== 'online'}
+                disabled={isCleaningUp || backendStatus !== 'online' || (storageInfo?.tempFileCount ?? 0) === 0}
                 style={{
                   padding: '10px 14px',
                   background: 'rgba(0, 122, 255, 0.1)',
                   border: 'none',
                   borderRadius: 10,
-                  color: backendStatus === 'online' ? '#007AFF' : 'rgba(0,0,0,0.3)',
+                  color: (backendStatus === 'online' && (storageInfo?.tempFileCount ?? 0) > 0) ? '#007AFF' : 'rgba(0,0,0,0.3)',
                   fontSize: 13,
                   fontWeight: 500,
-                  cursor: backendStatus === 'online' ? 'pointer' : 'not-allowed',
+                  cursor: (backendStatus === 'online' && (storageInfo?.tempFileCount ?? 0) > 0) ? 'pointer' : 'not-allowed',
                   textAlign: 'left',
                 }}
               >
                 Clear Temp Files
                 <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
-                  Uploaded images and converted splats
+                  {(storageInfo?.tempFileCount ?? 0) > 0 ? `${storageInfo?.tempFilesMb.toFixed(1)} MB in ${storageInfo?.tempFileCount} files` : 'No temp files'}
                 </span>
               </button>
 
@@ -329,7 +385,7 @@ export function DropZone({
               >
                 Reset Everything
                 <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
-                  Delete model, temp files, and clear settings
+                  Delete model, temp files, and clear browser settings
                 </span>
               </button>
 

@@ -4,7 +4,8 @@ import { useSettingsStore } from '../../stores';
 import type { HeadTrackingParams } from '../viewer/SplatViewer';
 
 // Slider configuration with actual min/max values and optional semantic labels
-// Ranges are centered around calibrated defaults (sensitivity: 0.01, depthSensitivity: 0.05)
+// Ranges are designed so calibrated defaults sit at sensible midpoints
+// This helps users understand "normal" values and how much to adjust
 const SLIDER_CONFIG: Record<string, {
   min: number;
   max: number;
@@ -12,19 +13,27 @@ const SLIDER_CONFIG: Record<string, {
   label: string;
   minLabel?: string;
   maxLabel?: string;
+  defaultValue?: number; // For reference in UI
 }> = {
-  // Motion settings - very subtle range centered at 0.01
-  sensitivity: { min: 0, max: 0.1, step: 0.001, label: 'Movement Scale', minLabel: 'None', maxLabel: 'Strong' },
-  depthSensitivity: { min: 0, max: 0.2, step: 0.005, label: 'Zoom Effect', minLabel: 'Off', maxLabel: 'Strong' },
+  // Motion settings - ranges centered around defaults
+  // Default sensitivity: 0.01 -> range 0 to 0.02 puts default at 50%
+  sensitivity: { min: 0, max: 0.02, step: 0.001, label: 'Movement Scale', minLabel: 'None', maxLabel: 'Strong', defaultValue: 0.01 },
+  // Default depthSensitivity: 0.05 -> range 0 to 0.1 puts default at 50%
+  depthSensitivity: { min: 0, max: 0.1, step: 0.005, label: 'Zoom Effect', minLabel: 'Off', maxLabel: 'Strong', defaultValue: 0.05 },
 
-  // Camera offsets (fine adjustments centered at calibrated values)
-  cameraX: { min: -1, max: 1, step: 0.01, label: 'X Offset' },
-  cameraY: { min: -1, max: 1, step: 0.01, label: 'Y Offset' },
-  cameraZ: { min: -2, max: 1, step: 0.01, label: 'Z Offset' },
+  // Camera offsets - ranges centered around defaults
+  // Default cameraX: 0.10 -> range -0.4 to 0.6 puts default at 50%
+  cameraX: { min: -0.4, max: 0.6, step: 0.01, label: 'X Offset', defaultValue: 0.10 },
+  // Default cameraY: 0 -> range -0.5 to 0.5 puts default at 50%
+  cameraY: { min: -0.5, max: 0.5, step: 0.01, label: 'Y Offset', defaultValue: 0 },
+  // Default cameraZ: -0.50 -> range -1.0 to 0 puts default at 50%
+  cameraZ: { min: -1.0, max: 0, step: 0.01, label: 'Z Offset', defaultValue: -0.50 },
 
-  // Smoothing
-  smoothing: { min: 0.05, max: 0.5, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth' },
-  deadZone: { min: 0, max: 0.02, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large' },
+  // Smoothing - ranges centered around defaults
+  // Default smoothing: 0.15 -> range 0.05 to 0.25 puts default at 50%
+  smoothing: { min: 0.05, max: 0.25, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth', defaultValue: 0.15 },
+  // Default deadZone: 0.005 -> range 0 to 0.01 puts default at 50%
+  deadZone: { min: 0, max: 0.01, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large', defaultValue: 0.005 },
 };
 
 // Only use these for numeric params

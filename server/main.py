@@ -785,7 +785,6 @@ async def cleanup_sharp_model():
     Delete the SHARP model cache (~2.6GB) from ~/.cache/torch/hub/checkpoints/
     This frees up disk space but the model will need to re-download on next conversion.
     """
-    import os
     cache_dir = Path.home() / ".cache" / "torch" / "hub" / "checkpoints"
 
     deleted_files = []
@@ -793,11 +792,20 @@ async def cleanup_sharp_model():
 
     if cache_dir.exists():
         for f in cache_dir.iterdir():
-            if f.is_file() and 'sharp' in f.name.lower():
-                size = f.stat().st_size
-                total_size += size
-                f.unlink()
-                deleted_files.append(f.name)
+            if f.is_file():
+                # Check for SHARP model files - the filename might be:
+                # - sharp_*.pt (original name)
+                # - A hash-based name for large models
+                # We check for 'sharp' OR files > 1GB (likely the SHARP model)
+                is_sharp = 'sharp' in f.name.lower()
+                is_large_model = f.name.endswith('.pt') and f.stat().st_size > 1_000_000_000  # > 1GB
+
+                if is_sharp or is_large_model:
+                    size = f.stat().st_size
+                    total_size += size
+                    f.unlink()
+                    deleted_files.append(f.name)
+                    print(f"[cleanup] Deleted model file: {f.name} ({size / (1024*1024):.1f} MB)")
 
     return {
         "status": "success",
@@ -865,8 +873,6 @@ async def get_storage_status():
     """
     Get current storage usage for SHARP model and temp files.
     """
-    import os
-
     # Check SHARP model cache
     cache_dir = Path.home() / ".cache" / "torch" / "hub" / "checkpoints"
     sharp_size = 0
@@ -874,10 +880,15 @@ async def get_storage_status():
 
     if cache_dir.exists():
         for f in cache_dir.iterdir():
-            if f.is_file() and 'sharp' in f.name.lower():
-                size = f.stat().st_size
-                sharp_size += size
-                sharp_files.append({"name": f.name, "size_mb": round(size / (1024 * 1024), 2)})
+            if f.is_file():
+                # Same detection logic as cleanup
+                is_sharp = 'sharp' in f.name.lower()
+                is_large_model = f.name.endswith('.pt') and f.stat().st_size > 1_000_000_000  # > 1GB
+
+                if is_sharp or is_large_model:
+                    size = f.stat().st_size
+                    sharp_size += size
+                    sharp_files.append({"name": f.name, "size_mb": round(size / (1024 * 1024), 2)})
 
     # Check temp directories
     temp_size = 0

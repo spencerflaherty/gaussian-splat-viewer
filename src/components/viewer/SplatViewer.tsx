@@ -61,6 +61,16 @@ export interface HeadTrackingParams {
     invertZ: boolean;
 }
 
+/** Camera position data for debugging/calibration */
+export interface CameraPositionData {
+    x: number;
+    y: number;
+    z: number;
+    targetX: number;
+    targetY: number;
+    targetZ: number;
+}
+
 interface SplatViewerProps {
     url: string;
     format: 'ply' | 'splat' | null;
@@ -69,6 +79,10 @@ interface SplatViewerProps {
     headTrackingParams?: HeadTrackingParams;
     onError?: (error: string) => void;
     onLoaded?: () => void;
+    /** Callback to get the centerView function */
+    onCenterViewReady?: (centerView: () => void) => void;
+    /** Callback for real-time camera position updates (for debugging) */
+    onCameraPositionUpdate?: (position: CameraPositionData) => void;
 }
 
 /**
@@ -110,7 +124,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };
 
-export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded }: SplatViewerProps) {
+export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate }: SplatViewerProps) {
     const params = headTrackingParams ?? DEFAULT_HEAD_TRACKING_PARAMS;
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<SplatViewerLib | null>(null);
@@ -121,6 +135,9 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadProgress, setLoadProgress] = useState(0);
+
+    // Store the "home" camera position (original image perspective)
+    const homeCameraRef = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
     // Debug stats (uncomment if needed for debugging)
     // const [debugStats, setDebugStats] = useState({
     //     splatCount: 0,
@@ -267,24 +284,51 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                         }, 100);
                     }
 
-                    // Auto-fit camera to scene bounds using SplatMesh bounding box
+                    // Position camera at original image perspective
                     setTimeout(() => {
                         if (!viewer.camera || !viewer.splatMesh) return;
 
-                        // Get bounding box from SplatMesh
+                        const camera = viewer.camera;
+
+                        // Get bounding box to understand scene scale
                         const box = viewer.splatMesh.getBoundingBox();
                         box.applyMatrix4(viewer.splatMesh.matrixWorld);
-
                         const center = box.getCenter(new THREE.Vector3());
                         const size = box.getSize(new THREE.Vector3());
                         const maxDim = Math.max(size.x, size.y, size.z);
 
-                        if (import.meta.env.DEV) console.log('[SplatWindow] Scene bounds:', { center, size, maxDim });
+                        if (import.meta.env.DEV) console.log('[SplatWindow] Scene bounds:', { center: center.toArray(), size: size.toArray(), maxDim });
 
-                        if (maxDim > 0 && isFinite(maxDim)) {
+                        // For SHARP PLY files, recreate the original image perspective
+                        // The original camera was looking "into" the scene from a distance
+                        // After 180° X rotation, we position in front of scene looking at center
+                        if (format === 'ply' && maxDim > 0 && isFinite(maxDim)) {
+                            // Calculate viewing distance - close enough to fill the frame
+                            // like the original image but with some margin
+                            const viewDistance = maxDim * 0.7;
+
+                            // Position camera in front of the scene (positive Z from center)
+                            // looking at the scene center to recreate original perspective
+                            camera.position.set(center.x, center.y, center.z + viewDistance);
+                            camera.lookAt(center);
+                            camera.updateMatrixWorld(true);
+
+                            // Set orbit target to scene center
+                            if (viewer.controls?.target) {
+                                viewer.controls.target.copy(center);
+                                viewer.controls.update();
+                            }
+
+                            // Store as home position
+                            homeCameraRef.current = {
+                                position: camera.position.clone(),
+                                target: center.clone(),
+                            };
+
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera positioned for PLY (original perspective), dist:', viewDistance);
+                        } else if (maxDim > 0 && isFinite(maxDim)) {
+                            // For .splat files, use bounding box center
                             const distance = maxDim * 1.5;
-                            const camera = viewer.camera;
-
                             camera.position.set(center.x, center.y, center.z + distance);
                             camera.lookAt(center);
                             camera.updateMatrixWorld(true);
@@ -294,15 +338,39 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                                 viewer.controls.update();
                             }
 
-                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera repositioned to:', camera.position, 'looking at:', center);
+                            homeCameraRef.current = {
+                                position: camera.position.clone(),
+                                target: center.clone(),
+                            };
+
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera at bounding box for splat format');
                         }
 
-                        // Configure orbit controls sensitivity (lower = less sensitive)
+                        // Configure orbit controls sensitivity
                         if (viewer.controls) {
-                            viewer.controls.rotateSpeed = 0.3;
-                            viewer.controls.panSpeed = 0.3;
-                            viewer.controls.zoomSpeed = 0.5;
-                            if (import.meta.env.DEV) console.log('[SplatWindow] Orbit controls sensitivity reduced');
+                            viewer.controls.rotateSpeed = 0.5;
+                            viewer.controls.panSpeed = 0.5;
+                            viewer.controls.zoomSpeed = 0.8;
+                        }
+
+                        // Provide centerView function to parent
+                        if (onCenterViewReady) {
+                            onCenterViewReady(() => {
+                                if (!viewer.camera || !homeCameraRef.current) return;
+                                viewer.camera.position.copy(homeCameraRef.current.position);
+                                viewer.camera.lookAt(homeCameraRef.current.target);
+                                viewer.camera.updateMatrixWorld(true);
+                                if (viewer.controls?.target) {
+                                    viewer.controls.target.copy(homeCameraRef.current.target);
+                                    viewer.controls.update();
+                                }
+                                // Also update head tracking base
+                                lastOrbitCameraRef.current = {
+                                    position: homeCameraRef.current.position.clone(),
+                                    target: homeCameraRef.current.target.clone(),
+                                };
+                                if (import.meta.env.DEV) console.log('[SplatWindow] Centered view');
+                            });
                         }
                     }, 200);
 
@@ -504,6 +572,16 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
             camera.lookAt(base.target);
             camera.updateMatrixWorld(true);
 
+            // Report camera position for debugging
+            onCameraPositionUpdate?.({
+                x: newPos.x,
+                y: newPos.y,
+                z: newPos.z,
+                targetX: base.target.x,
+                targetY: base.target.y,
+                targetZ: base.target.z,
+            });
+
             animationRef.current = requestAnimationFrame(updateCamera);
         };
 
@@ -520,6 +598,34 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         };
     // Note: params removed from deps - we use paramsRef.current inside RAF for immediate updates
     }, [controlMode, loading, headPosition]);
+
+    // Camera position reporting for orbit mode
+    useEffect(() => {
+        if (!viewerRef.current || loading || controlMode !== 'orbit' || !onCameraPositionUpdate) return;
+
+        const viewer = viewerRef.current;
+        let intervalId: ReturnType<typeof setInterval>;
+
+        const reportPosition = () => {
+            if (!viewer.camera) return;
+            const pos = viewer.camera.position;
+            const target = viewer.controls?.target || new THREE.Vector3(0, 0, 0);
+            onCameraPositionUpdate({
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+                targetX: target.x,
+                targetY: target.y,
+                targetZ: target.z,
+            });
+        };
+
+        // Report every 100ms in orbit mode
+        intervalId = setInterval(reportPosition, 100);
+        reportPosition(); // Initial report
+
+        return () => clearInterval(intervalId);
+    }, [controlMode, loading, onCameraPositionUpdate]);
 
     return (
         <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>

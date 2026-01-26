@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useHeadTracking } from './hooks/useHeadTracking';
 import { useBackendStatus } from './hooks/useBackendStatus';
-import { SplatViewer } from './components/viewer/SplatViewer';
+import { SplatViewer, type CameraPositionData } from './components/viewer/SplatViewer';
 import { HUDOverlay } from './components/controls/HUD';
 import { DropZone } from './components/upload/DropZone';
 import { ConversionProgress } from './components/upload/ConversionProgress';
@@ -68,6 +68,12 @@ function App() {
 
   // State for setup modal
   const [showSetupModal, setShowSetupModal] = useState(false);
+
+  // Center view function from SplatViewer
+  const centerViewRef = useRef<(() => void) | null>(null);
+
+  // Camera position for debugging
+  const [cameraPosition, setCameraPosition] = useState<CameraPositionData | null>(null);
 
   // Show settings panel on first use when entering head tracking mode
   useEffect(() => {
@@ -255,6 +261,8 @@ function App() {
             headTrackingParams={params}
             onLoaded={handleSplatLoaded}
             onError={handleSplatError}
+            onCenterViewReady={(fn) => { centerViewRef.current = fn; }}
+            onCameraPositionUpdate={setCameraPosition}
           />
         </div>
       )}
@@ -275,6 +283,8 @@ function App() {
           isCalibrated={isCalibrated}
           onRecalibrate={recalibrate}
           highlightSettings={highlightSettings}
+          onCenterView={() => centerViewRef.current?.()}
+          cameraPosition={cameraPosition}
         />
       )}
 

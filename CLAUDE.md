@@ -254,6 +254,33 @@ MediaPipe's native Z coordinate is unreliable for depth (it's relative to head c
 ### ErrorBoundary.tsx (57 lines)
 React Error Boundary to catch unhandled errors and display a user-friendly error screen with reload button.
 
+### HUD.tsx - Camera Position Debug Box
+The HUD includes a **Camera Position Debug Box** in the top-right corner that displays real-time camera coordinates:
+- **X, Y, Z**: Current camera position in 3D space
+- **Look At**: The target point the camera is facing
+
+This is useful for:
+- Calibrating default camera positions
+- Debugging scene visibility issues
+- Understanding how head tracking affects camera position
+
+The debug box auto-hides with the rest of the HUD controls after 3 seconds of inactivity.
+
+**Data Flow:**
+```typescript
+// SplatViewer exports CameraPositionData interface
+export interface CameraPositionData {
+    x: number; y: number; z: number;
+    targetX: number; targetY: number; targetZ: number;
+}
+
+// SplatViewer calls onCameraPositionUpdate callback
+<SplatViewer onCameraPositionUpdate={setCameraPosition} />
+
+// App.tsx threads position to HUD
+<HUDOverlay cameraPosition={cameraPosition} />
+```
+
 ---
 
 ## Head Tracking & Parallax Effect
@@ -275,34 +302,34 @@ Your screen acts as a virtual window into a 3D scene. The webcam tracks your hea
 
 ### Head Tracking Parameters
 
-All parameters use a **centered-at-zero** slider design. Sliders display 0 at the default value, with adjustments shown as positive/negative offsets. All sliders support **0.01 precision** and allow direct text input.
+Sliders show **real values** with ranges designed so **defaults sit at ~50%** (the middle). This helps users understand "normal" values and how much to adjust. All sliders support direct text input for precise control.
 
-#### Core Parameters (Calibrated January 2025)
+#### Motion Parameters (Calibrated January 2025)
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
-| `distance` | **2.5** | ±10 | Base distance from viewer to virtual screen |
-| `sensitivity` | **0.2** | ±2.0 | Movement multiplier. 0.2 = subtle, natural parallax |
-| `screenSize` | **0.5** | ±20 | Virtual screen size for frustum calculation |
-| `verticalOffset` | **0.69** | ±1.0 | Webcam position compensation |
+| `sensitivity` | **0.01** | 0 - 0.02 | Movement scale. Default at 50% of range |
+| `depthSensitivity` | **0.05** | 0 - 0.1 | Zoom effect strength. Default at 50% |
 
 #### Camera Offsets
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
-| `cameraX` | 0 | ±20 | Manual X offset for scene centering |
-| `cameraY` | 0 | ±20 | Manual Y offset for scene centering |
-| `cameraZ` | **-2** | ±20 | Manual Z offset for scene centering |
-
-#### Focus & Depth
-| Parameter | Default | Range | Description |
-|-----------|---------|-------|-------------|
-| `focusDepth` | 0 | ±50 | Z coordinate where the "screen plane" sits |
-| `depthSensitivity` | **0.15** | ±2 | How much Z movement affects zoom (0 = disabled) |
+| `cameraX` | **0.10** | -0.4 to 0.6 | X offset for scene centering. Default at 50% |
+| `cameraY` | **0** | -0.5 to 0.5 | Y offset for scene centering. Default at 50% |
+| `cameraZ` | **-0.50** | -1.0 to 0 | Z offset (pull camera back). Default at 50% |
 
 #### Smoothing
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
-| `smoothing` | **0.26** | ±0.5 | Exponential smoothing factor (lower = smoother but laggy) |
-| `deadZone` | **0.008** | ±0.1 | Ignore movements smaller than this threshold |
+| `smoothing` | **0.15** | 0.05 - 0.25 | Smoothing factor (lower = more responsive). Default at 50% |
+| `deadZone` | **0.005** | 0 - 0.01 | Ignore small movements. Default at 50% |
+
+#### Legacy Parameters (kept for compatibility)
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `distance` | 2.5 | Base distance (not actively used in camera translation mode) |
+| `screenSize` | 0.5 | Virtual screen size (not actively used) |
+| `verticalOffset` | 0 | Webcam compensation (not actively used) |
+| `focusDepth` | 0 | Screen plane Z coordinate (not actively used) |
 
 #### Axis Controls (UI Toggles)
 | Parameter | Default | Description |
@@ -560,11 +587,14 @@ server: {
 | Black screen, console errors | WebGL context issue | Check WebGL2 support, verify format code |
 | Scene upside-down | Rotation not applied | Add `rotation: [1, 0, 0, 0]` for PLY |
 | Scene not visible | Camera position wrong | Try orbit controls to find scene |
-| Head tracking weak | Old settings in localStorage | Run `localStorage.removeItem('splatWindowSettings_v7')` |
+| Scene appears very small | Camera too far from content | Use scroll wheel to zoom in, or click Center View button |
+| Head tracking weak | Old settings in localStorage | Run `localStorage.removeItem('splat-viewer-settings')` |
 | Backend conversion fails | Server not running | Run `npm start` or `npm run backend` |
 | Head tracking doesn't work | Camera denied | Check browser permissions |
 | Depth (Z) not working | Calibration needed | Wait 1-2 seconds for baseline calibration; check console for "Baseline face width calibrated" |
 | Axis movement reversed | Need to flip axis | Use Flip X/Y/Z buttons in Settings panel |
+| Conversion stuck at 80% | SHARP still processing | This is normal - SHARP takes 60-120s for large images |
+| "Separator not found" error | SSE stream issue | Retry the conversion; may be a network hiccup |
 
 ### Console Message Sequence (Successful Load)
 
@@ -619,6 +649,9 @@ self.crossOriginIsolated
 - **State Management**: Zustand stores for settings, viewer, and animation ✅
 - **Calibration Wizard**: Visual feedback during head tracking calibration ✅
 - **Settings Presets**: Subtle, Natural, Dramatic one-click presets ✅
+- **Camera Position Debug Box**: Real-time display of camera X/Y/Z coordinates and target point ✅
+- **Slider Ranges Centered**: All sliders have ranges where defaults sit at ~50% for intuitive adjustment ✅
+- **Install Script Auto-Run**: `curl | bash` installer now auto-starts the app ✅
 
 ### Planned Features
 - **Animation Export (MP4)**: ffmpeg.wasm integration for video export

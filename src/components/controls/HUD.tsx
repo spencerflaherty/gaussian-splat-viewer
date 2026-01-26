@@ -3,6 +3,7 @@ import { LiquidGlass } from '../ui/LiquidGlass';
 import { ModeSwitcher } from './ModeSwitcher';
 import { SettingsPanel } from './SettingsPanel';
 import { CalibrationWizard } from './CalibrationWizard';
+import type { CameraPositionData } from '../viewer/SplatViewer';
 
 export interface HUDOverlayProps {
   showControls: boolean;
@@ -21,6 +22,10 @@ export interface HUDOverlayProps {
   onRecalibrate: () => void;
   // First-use highlight
   highlightSettings?: boolean;
+  // Center view callback
+  onCenterView?: () => void;
+  // Camera position for debugging
+  cameraPosition?: CameraPositionData | null;
 }
 
 /**
@@ -46,6 +51,8 @@ export function HUDOverlay({
   isCalibrated,
   onRecalibrate,
   highlightSettings = false,
+  onCenterView,
+  cameraPosition,
 }: HUDOverlayProps) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 999999, pointerEvents: 'none' }}>
@@ -56,6 +63,46 @@ export function HUDOverlay({
         setControlMode={setControlMode}
         visible={showControls}
       />
+
+      {/* Camera Position Debug Box (top-right) */}
+      {cameraPosition && (
+        <div style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          opacity: showControls ? 1 : 0,
+          transition: 'opacity 0.3s ease',
+          pointerEvents: showControls ? 'auto' : 'none',
+        }}>
+          <LiquidGlass variant="sidebar" style={{ padding: 12, minWidth: 180 }}>
+            <div style={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 8 }}>
+              Camera Position
+            </div>
+            <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 12, lineHeight: 1.6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(0, 0, 0, 0.5)' }}>X:</span>
+                <span style={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>{cameraPosition.x.toFixed(3)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(0, 0, 0, 0.5)' }}>Y:</span>
+                <span style={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>{cameraPosition.y.toFixed(3)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(0, 0, 0, 0.5)' }}>Z:</span>
+                <span style={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>{cameraPosition.z.toFixed(3)}</span>
+              </div>
+            </div>
+            <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', marginTop: 8, paddingTop: 8 }}>
+              <div style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.35)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
+                Look At
+              </div>
+              <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 11, color: 'rgba(0, 0, 0, 0.6)' }}>
+                ({cameraPosition.targetX.toFixed(2)}, {cameraPosition.targetY.toFixed(2)}, {cameraPosition.targetZ.toFixed(2)})
+              </div>
+            </div>
+          </LiquidGlass>
+        </div>
+      )}
 
       {/* Bottom Bar */}
       <div style={{
@@ -74,6 +121,34 @@ export function HUDOverlay({
                 <div style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Scene</div>
                 <div style={{ fontSize: 13, color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
               </div>
+              <div style={{ width: 1, height: 28, background: 'rgba(0, 0, 0, 0.1)' }} />
+            </>
+          )}
+          {/* Center View button */}
+          {onCenterView && (
+            <>
+              <button
+                onClick={onCenterView}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  background: 'rgba(0, 0, 0, 0.05)',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'rgba(0, 0, 0, 0.6)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                title="Center View"
+              >
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="3" />
+                  <path strokeLinecap="round" d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+                </svg>
+              </button>
               <div style={{ width: 1, height: 28, background: 'rgba(0, 0, 0, 0.1)' }} />
             </>
           )}
