@@ -627,6 +627,8 @@ server: {
 | **Depth (Z) tracking not working** | `useHeadTracking.ts` | **FIXED** - Replaced MediaPipe Z with face-width measurement |
 | No axis flip controls | `App.tsx` | **FIXED** - Added invertX/Y/Z toggles |
 | Slider precision too coarse | `App.tsx` | **FIXED** - Changed to 0.01 step with text input |
+| **Progress stuck at 80%** | `server/main.py` | **FIXED** - Changed to asymptotic progress curve that never exceeds 79% until SHARP completes |
+| **LimitOverrunError on long output** | `server/main.py` | **FIXED** - Replaced `readline()` with chunked `read()` to handle SHARP output >64KB |
 
 ### Remaining Issues
 
@@ -658,7 +660,7 @@ server: {
 | Depth (Z) not working | Calibration needed | Wait 1-2 seconds for baseline calibration; check console for "Baseline face width calibrated" |
 | Axis movement reversed | Need to flip axis | Use Flip X/Y/Z buttons in Settings panel |
 | Progress slow at 70-79% | SHARP still processing | Normal for large images at 100% quality - uses asymptotic progress that never exceeds 79% until complete |
-| "Separator not found" error | SSE stream issue | Retry the conversion; may be a network hiccup |
+| "Separator not found" error | Was: asyncio LimitOverrunError | **FIXED** - Now uses chunked reads; if still occurs, restart backend |
 
 ### Console Message Sequence (Successful Load)
 
@@ -683,6 +685,8 @@ server: {
 | Python version error | Need Python 3.10+, use the .venv |
 | Disk space error | Need ~5GB free space |
 | Port 8000 in use | `lsof -ti :8000 \| xargs kill -9` |
+| "Separator not found, chunk exceed limit" | Restart backend - this was caused by asyncio buffer overflow, now fixed with chunked reads |
+| Progress stuck at high % | Normal behavior - progress uses asymptotic curve approaching 79% until SHARP completes |
 
 ### Diagnostic Commands
 
