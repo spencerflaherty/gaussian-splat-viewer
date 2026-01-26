@@ -12,17 +12,18 @@ const SLIDER_CONFIG: Record<string, {
   minLabel?: string;
   maxLabel?: string;
 }> = {
-  sensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Sensitivity', minLabel: 'Subtle', maxLabel: 'Dramatic' },
-  distance: { min: 0.5, max: 20, step: 0.1, label: 'Distance', minLabel: 'Close', maxLabel: 'Far' },
-  screenSize: { min: 0.1, max: 5, step: 0.01, label: 'Screen Size' },
-  verticalOffset: { min: -1.0, max: 2.0, step: 0.01, label: 'Vertical Offset' },
-  depthSensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Depth Sensitivity', minLabel: 'Off', maxLabel: 'Strong' },
-  cameraX: { min: -20, max: 20, step: 0.1, label: 'Camera X' },
-  cameraY: { min: -20, max: 20, step: 0.1, label: 'Camera Y' },
-  cameraZ: { min: -20, max: 20, step: 0.1, label: 'Camera Z' },
-  focusDepth: { min: -50, max: 50, step: 0.1, label: 'Focus Depth' },
-  smoothing: { min: 0.01, max: 0.5, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth' },
-  deadZone: { min: 0, max: 0.1, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large' },
+  // Motion settings
+  sensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Movement Scale', minLabel: 'Subtle', maxLabel: 'Dramatic' },
+  depthSensitivity: { min: 0, max: 1.0, step: 0.01, label: 'Zoom Effect', minLabel: 'Off', maxLabel: 'Strong' },
+
+  // Camera offsets (additive adjustments)
+  cameraX: { min: -5, max: 5, step: 0.1, label: 'X Offset' },
+  cameraY: { min: -5, max: 5, step: 0.1, label: 'Y Offset' },
+  cameraZ: { min: -5, max: 5, step: 0.1, label: 'Z Offset' },
+
+  // Smoothing
+  smoothing: { min: 0.05, max: 0.5, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth' },
+  deadZone: { min: 0, max: 0.05, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large' },
 };
 
 // Only use these for numeric params
@@ -237,25 +238,17 @@ export function SettingsPanel({
                 Motion
               </div>
               {renderSlider('sensitivity' as NumericParams)}
-              {renderSlider('distance' as NumericParams)}
               {renderSlider('depthSensitivity' as NumericParams)}
             </div>
 
-            {/* View Section */}
+            {/* Offset Section */}
             <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                View
+                Offset Adjustments
               </div>
-              {renderSlider('screenSize' as NumericParams)}
-              {renderSlider('verticalOffset' as NumericParams)}
-              {renderSlider('focusDepth' as NumericParams)}
-            </div>
-
-            {/* Camera Offsets Section */}
-            <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                Camera Offsets
-              </div>
+              <p style={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.4)', marginBottom: 10 }}>
+                Fine-tune the camera position relative to your head
+              </p>
               {renderSlider('cameraX' as NumericParams)}
               {renderSlider('cameraY' as NumericParams)}
               {renderSlider('cameraZ' as NumericParams)}

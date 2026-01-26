@@ -7,26 +7,26 @@ import { DEFAULT_HEAD_TRACKING_PARAMS } from '../components/viewer/SplatViewer';
  * Presets for head tracking parameters
  *
  * These provide quick starting points for different use cases:
- * - Subtle: Minimal parallax, good for static viewing
- * - Natural: Balanced parallax, recommended for most users
- * - Dramatic: Pronounced parallax, more immersive but can be disorienting
+ * - Subtle: Minimal movement, good for static viewing
+ * - Natural: Balanced movement, recommended for most users
+ * - Dramatic: Pronounced movement, more immersive but can be disorienting
  */
 export const PRESETS = {
   subtle: {
     ...DEFAULT_HEAD_TRACKING_PARAMS,
-    sensitivity: 0.1,
-    depthSensitivity: 0.05,
-    smoothing: 0.3,
+    sensitivity: 0.2,        // Less camera movement
+    depthSensitivity: 0.1,   // Subtle zoom
+    smoothing: 0.2,          // Smoother
   },
   natural: {
     ...DEFAULT_HEAD_TRACKING_PARAMS,
-    // Uses calibrated defaults
+    // Uses calibrated defaults (sensitivity: 0.5, depthSensitivity: 0.3)
   },
   dramatic: {
     ...DEFAULT_HEAD_TRACKING_PARAMS,
-    sensitivity: 0.4,
-    depthSensitivity: 0.3,
-    smoothing: 0.2,
+    sensitivity: 1.0,        // More camera movement
+    depthSensitivity: 0.5,   // More zoom effect
+    smoothing: 0.1,          // More responsive
   },
 } as const;
 

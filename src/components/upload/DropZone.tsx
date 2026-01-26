@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RefObject } from 'react';
 import { LiquidGlass } from '../ui/LiquidGlass';
 
@@ -13,6 +14,8 @@ export interface DropZoneProps {
   fileInputRef: RefObject<HTMLInputElement | null>;
   onFileSelect: (file: File) => void;
 }
+
+const BACKEND_URL = 'http://127.0.0.1:8000';
 
 /**
  * DropZone - Upload area for splat files and images
@@ -34,6 +37,37 @@ export function DropZone({
   fileInputRef,
   onFileSelect,
 }: DropZoneProps) {
+  const [showManage, setShowManage] = useState(false);
+  const [cleanupStatus, setCleanupStatus] = useState<string | null>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+
+  const handleCleanup = async (type: 'sharp-model' | 'temp-files' | 'all') => {
+    setIsCleaningUp(true);
+    setCleanupStatus('Cleaning up...');
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/cleanup/${type}`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (type === 'all') {
+        // Clear localStorage
+        localStorage.clear();
+        setCleanupStatus(`Freed ${data.total_freed_mb}MB. ${data.manual_steps[0]}`);
+      } else if (type === 'sharp-model') {
+        setCleanupStatus(data.freed_mb > 0 ? `Freed ${data.freed_mb}MB` : 'No model found');
+      } else {
+        setCleanupStatus(data.freed_mb > 0 ? `Freed ${data.freed_mb}MB` : 'No temp files');
+      }
+    } catch (err) {
+      setCleanupStatus('Cleanup failed - is the backend running?');
+    } finally {
+      setIsCleaningUp(false);
+      setTimeout(() => setCleanupStatus(null), 3000);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center h-full px-4">
       {/* Header */}
@@ -188,6 +222,131 @@ export function DropZone({
               >
                 ×
               </button>
+            </div>
+          </LiquidGlass>
+        </div>
+      )}
+
+      {/* Manage Button (bottom right) */}
+      <button
+        onClick={() => setShowManage(!showManage)}
+        style={{
+          position: 'fixed',
+          bottom: 20,
+          right: 20,
+          padding: '8px 16px',
+          background: 'rgba(255, 255, 255, 0.2)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: 20,
+          color: 'rgba(255, 255, 255, 0.8)',
+          fontSize: 13,
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          transition: 'all 0.2s',
+        }}
+      >
+        {showManage ? 'Close' : 'Manage'}
+      </button>
+
+      {/* Manage Panel */}
+      {showManage && (
+        <div style={{ position: 'fixed', bottom: 60, right: 20 }}>
+          <LiquidGlass style={{ padding: 16, width: 280 }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 600, color: 'rgba(0,0,0,0.85)' }}>
+              Storage Management
+            </h3>
+
+            {cleanupStatus && (
+              <p style={{
+                margin: '0 0 12px 0',
+                padding: '8px 12px',
+                background: 'rgba(0, 122, 255, 0.1)',
+                borderRadius: 8,
+                fontSize: 13,
+                color: '#007AFF',
+              }}>
+                {cleanupStatus}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => handleCleanup('sharp-model')}
+                disabled={isCleaningUp || backendStatus !== 'online'}
+                style={{
+                  padding: '10px 14px',
+                  background: 'rgba(255, 149, 0, 0.1)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: backendStatus === 'online' ? '#FF9500' : 'rgba(0,0,0,0.3)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: backendStatus === 'online' ? 'pointer' : 'not-allowed',
+                  textAlign: 'left',
+                }}
+              >
+                Delete SHARP Model (~2.6GB)
+                <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                  Will re-download on next conversion
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleCleanup('temp-files')}
+                disabled={isCleaningUp || backendStatus !== 'online'}
+                style={{
+                  padding: '10px 14px',
+                  background: 'rgba(0, 122, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: backendStatus === 'online' ? '#007AFF' : 'rgba(0,0,0,0.3)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: backendStatus === 'online' ? 'pointer' : 'not-allowed',
+                  textAlign: 'left',
+                }}
+              >
+                Clear Temp Files
+                <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                  Uploaded images and converted splats
+                </span>
+              </button>
+
+              <button
+                onClick={() => handleCleanup('all')}
+                disabled={isCleaningUp || backendStatus !== 'online'}
+                style={{
+                  padding: '10px 14px',
+                  background: 'rgba(255, 59, 48, 0.1)',
+                  border: 'none',
+                  borderRadius: 10,
+                  color: backendStatus === 'online' ? '#FF3B30' : 'rgba(0,0,0,0.3)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: backendStatus === 'online' ? 'pointer' : 'not-allowed',
+                  textAlign: 'left',
+                }}
+              >
+                Reset Everything
+                <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                  Delete model, temp files, and clear settings
+                </span>
+              </button>
+
+              {backendStatus !== 'online' && (
+                <p style={{ margin: '8px 0 0 0', fontSize: 11, color: 'rgba(0,0,0,0.4)', textAlign: 'center' }}>
+                  Start the backend to enable cleanup options
+                </p>
+              )}
+
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'rgba(0,0,0,0.4)' }}>
+                  To stop servers: Press Ctrl+C in terminal
+                </p>
+                <p style={{ margin: '4px 0 0 0', fontSize: 11, color: 'rgba(0,0,0,0.4)' }}>
+                  To uninstall: rm -rf ~/.splat-window
+                </p>
+              </div>
             </div>
           </LiquidGlass>
         </div>

@@ -72,42 +72,42 @@ interface SplatViewerProps {
 }
 
 /**
- * Default parameters tuned for natural "window into a photo" experience.
- * The image should fill the screen and respond subtly to head movement.
+ * Default parameters tuned for natural "looking around the corner" experience.
+ * Move your head to peek around the scene as if looking through a window.
  *
  * These values are calibrated based on extensive user testing.
  */
 export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
-    // Core - tuned from user testing
-    distance: 2.5,           // Viewing distance
-    sensitivity: 0.2,        // Moderate parallax - feels natural
-    screenSize: 0.5,         // Virtual screen size for frustum
-    verticalOffset: 0.69,    // Webcam position compensation (calibrated)
+    // Core - tuned for camera translation approach
+    distance: 2.5,           // Not used in new approach but kept for compatibility
+    sensitivity: 0.5,        // How much the camera moves relative to head movement
+    screenSize: 0.5,         // Not used in new approach but kept for compatibility
+    verticalOffset: 0,       // Not used in new approach
 
-    // Camera offsets (for scene centering)
-    cameraX: 0,
-    cameraY: 0,
-    cameraZ: -2,
+    // Camera offsets - added to head tracking movement
+    cameraX: 0,              // Additional X offset (manual adjustment)
+    cameraY: 0,              // Additional Y offset (manual adjustment)
+    cameraZ: 0,              // Additional Z offset (manual adjustment)
 
     // Focus
-    focusDepth: 0,           // Scene origin at screen plane
+    focusDepth: 0,           // Not used in new approach but kept for compatibility
 
     // Depth tracking
-    depthSensitivity: 0.15,  // Subtle zoom on lean in/out
+    depthSensitivity: 0.3,   // How much lean in/out affects zoom
 
     // Smoothing
-    smoothing: 0.26,         // Smooth movement
-    deadZone: 0.008,         // Ignore small jitter
+    smoothing: 0.15,         // Lower = smoother but more latency
+    deadZone: 0.005,         // Ignore small jitter
 
     // Axis toggles - all enabled by default
     enableX: true,           // Left/right tracking
     enableY: true,           // Up/down tracking
     enableZ: true,           // Depth/zoom tracking
 
-    // Axis inversion - X and Y flipped by default (calibrated)
-    invertX: true,
-    invertY: true,
-    invertZ: false,
+    // Axis inversion - calibrated for natural movement
+    invertX: false,          // Move head left -> camera moves left -> see right side
+    invertY: false,          // Move head up -> camera moves up -> see bottom
+    invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };
 
 export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded }: SplatViewerProps) {
@@ -355,7 +355,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         };
     }, [url, format]);
 
-    // Store last orbit camera position to preserve when switching modes
+    // Store last orbit camera position to restore when switching back
     const lastOrbitCameraRef = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
 
     // Toggle controls based on mode - preserve camera position between modes
@@ -365,57 +365,41 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         const viewer = viewerRef.current;
 
         if (viewer.controls && viewer.camera) {
-            // Switching TO orbit mode - restore last orbit position or use current
             if (controlMode === 'orbit') {
+                // Switching TO orbit mode
                 viewer.controls.enabled = true;
 
+                // Restore saved orbit position if we have one
                 if (lastOrbitCameraRef.current) {
-                    // Restore saved orbit position
                     viewer.camera.position.copy(lastOrbitCameraRef.current.position);
                     if (viewer.controls.target) {
                         viewer.controls.target.copy(lastOrbitCameraRef.current.target);
                     }
                     viewer.camera.lookAt(lastOrbitCameraRef.current.target);
                 }
-                // If no saved position, keep current camera position (from head tracking)
                 viewer.camera.updateMatrixWorld(true);
                 viewer.controls.update();
-                if (import.meta.env.DEV) console.log('[SplatWindow] Enabled orbit controls, camera preserved');
-            }
-            // Switching TO head tracking mode - use orbit camera position as base
-            else {
-                // Save current orbit camera position for reference
-                if (viewer.controls.enabled) {
-                    const pos = viewer.camera.position;
-                    const target = viewer.controls.target || new THREE.Vector3(0, 0, 0);
-                    lastOrbitCameraRef.current = {
-                        position: pos.clone(),
-                        target: target.clone(),
-                    };
+                if (import.meta.env.DEV) console.log('[SplatWindow] Enabled orbit controls');
+            } else {
+                // Switching TO head tracking mode
+                // Save current orbit camera position so we can use it as base for head tracking
+                const pos = viewer.camera.position;
+                const target = viewer.controls.target || new THREE.Vector3(0, 0, 0);
+                lastOrbitCameraRef.current = {
+                    position: pos.clone(),
+                    target: target.clone(),
+                };
 
-                    // Update the camera offset params to match orbit position
-                    // This makes head tracking work relative to where user positioned in orbit mode
-                    const currentParams = paramsRef.current;
-                    const baseZ = currentParams.distance;
-
-                    // Calculate what offsets would put camera at current orbit position
-                    paramsRef.current = {
-                        ...currentParams,
-                        cameraX: pos.x,
-                        cameraY: pos.y - (currentParams.verticalOffset * currentParams.screenSize),
-                        cameraZ: pos.z - baseZ,
-                        focusDepth: target.z,
-                    };
-
-                    if (import.meta.env.DEV) console.log('[SplatWindow] Updated head tracking base to orbit position:', pos.toArray());
-                }
                 viewer.controls.enabled = false;
-                if (import.meta.env.DEV) console.log('[SplatWindow] Disabled orbit controls for head tracking');
+                if (import.meta.env.DEV) console.log('[SplatWindow] Disabled orbit controls, head tracking base:', pos.toArray());
             }
         }
     }, [controlMode, loading]);
 
-    // Head tracking camera updates with off-axis projection
+    // Store base camera position from orbit mode (set when switching to head tracking)
+    const baseCameraRef = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+
+    // Head tracking camera updates with actual camera translation
     useEffect(() => {
         // Cancel any existing RAF to prevent memory leak
         if (animationRef.current) {
@@ -428,28 +412,37 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         // Only run in head tracking mode
         if (controlMode !== 'head') return;
 
+        const viewer = viewerRef.current;
+
+        // Capture the current camera position as the "home" base for head tracking
+        if (!baseCameraRef.current && viewer.camera) {
+            baseCameraRef.current = {
+                position: viewer.camera.position.clone(),
+                target: viewer.controls?.target?.clone() || new THREE.Vector3(0, 0, 0),
+            };
+            if (import.meta.env.DEV) console.log('[SplatWindow] Set head tracking base:', baseCameraRef.current.position.toArray());
+        }
+
         if (import.meta.env.DEV) console.log('[SplatWindow] Starting head tracking camera loop');
 
         /**
-         * Off-Axis Projection Implementation
+         * Camera Translation Implementation - "Looking Around the Corner" Effect
          *
-         * The key insight: your screen is a virtual window into a 3D scene.
-         * As your head moves, we shift the camera frustum asymmetrically
-         * to create the parallax effect.
+         * Instead of off-axis projection, we use simple camera translation:
+         * 1. Keep looking at a fixed focal point (the scene center)
+         * 2. Move the camera position based on head movement
+         * 3. This creates the illusion of "peeking around" the scene
          *
-         * Eye position in screen-space:
-         *   eyeX = headPos.x * sensitivity + cameraX
-         *   eyeY = headPos.y * sensitivity + verticalOffset + cameraY
-         *   eyeZ = distance + (headPos.z * depthSensitivity) + cameraZ
-         *
-         * Frustum boundaries:
-         *   left   = (-screenWidth/2 - eyeX) * near / eyeZ
-         *   right  = (screenWidth/2 - eyeX) * near / eyeZ
-         *   bottom = (-screenHeight/2 - eyeY) * near / eyeZ
-         *   top    = (screenHeight/2 - eyeY) * near / eyeZ
+         * Movement mapping:
+         *   - Head moves left -> Camera moves left -> See more of the right side
+         *   - Head moves up -> Camera moves up -> See more of the bottom
+         *   - Head moves closer -> Camera moves closer -> Zoom in effect
          */
         const updateCamera = () => {
-            if (!viewerRef.current) return;
+            if (!viewerRef.current || !baseCameraRef.current) {
+                animationRef.current = requestAnimationFrame(updateCamera);
+                return;
+            }
 
             const camera = viewerRef.current.camera;
             if (!camera || !containerRef.current) {
@@ -457,19 +450,15 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 return;
             }
 
-            // Get smoothed head position
+            // Get smoothed head position (-1 to 1 range)
             const hp = headPosition.current;
 
             // Extract params from ref to avoid stale closure
             const {
-                distance,
                 sensitivity,
-                screenSize,
-                verticalOffset,
                 cameraX,
                 cameraY,
                 cameraZ,
-                focusDepth,
                 depthSensitivity,
                 enableX,
                 enableY,
@@ -479,82 +468,41 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 invertZ
             } = paramsRef.current;
 
-            // Calculate eye position in screen-space coordinates
-            // Use smoothed values for smooth camera movement
-            // Each axis can be toggled on/off and inverted independently
-            const xMult = invertX ? -1 : 1;
-            const yMult = invertY ? 1 : -1; // Base Y is already negated, so invert flips it back
-            const zMult = invertZ ? -1 : 1;
+            // Base position from when we entered head tracking mode
+            const base = baseCameraRef.current;
 
-            const xOffset = enableX ? (hp.smoothedX * sensitivity * screenSize * xMult) : 0;
-            const yOffset = enableY ? (hp.smoothedY * sensitivity * screenSize * yMult) : 0;
+            // Calculate camera movement scale based on distance to target
+            const distToTarget = base.position.distanceTo(base.target);
+            const moveScale = distToTarget * sensitivity;
 
-            const eyeX = xOffset + cameraX;
-            const eyeY = yOffset + (verticalOffset * screenSize) + cameraY;
+            // Apply axis toggles and inversions
+            const xMult = (invertX ? -1 : 1) * (enableX ? 1 : 0);
+            const yMult = (invertY ? -1 : 1) * (enableY ? 1 : 0);
+            const zMult = (invertZ ? -1 : 1) * (enableZ ? 1 : 0);
 
-            // Depth: positive hp.z (closer to webcam) should zoom in (decrease distance)
-            const depthOffset = enableZ ? (hp.smoothedZ * depthSensitivity * screenSize * zMult) : 0;
-            const eyeZ = distance + cameraZ - depthOffset;
+            // Calculate camera offset from head position
+            // Move in the same direction as head movement for "looking around" effect
+            const xOffset = hp.smoothedX * moveScale * xMult + cameraX;
+            const yOffset = hp.smoothedY * moveScale * yMult + cameraY;
+            const zOffset = hp.smoothedZ * distToTarget * depthSensitivity * zMult + cameraZ;
 
-            // Validate eyeZ to prevent division by zero or negative values
-            const safeEyeZ = Math.max(eyeZ, 0.5);
+            // New camera position = base position + offset
+            const newPos = new THREE.Vector3(
+                base.position.x + xOffset,
+                base.position.y + yOffset,
+                base.position.z - zOffset  // Negative because moving closer (positive Z) should decrease distance
+            );
 
-            // Calculate aspect ratio from container
-            const containerWidth = containerRef.current.clientWidth;
-            const containerHeight = containerRef.current.clientHeight;
+            // Clamp to reasonable bounds to prevent extreme positions
+            const maxOffset = distToTarget * 2;
+            newPos.x = Math.max(base.position.x - maxOffset, Math.min(base.position.x + maxOffset, newPos.x));
+            newPos.y = Math.max(base.position.y - maxOffset, Math.min(base.position.y + maxOffset, newPos.y));
+            newPos.z = Math.max(0.5, Math.min(base.position.z + maxOffset, newPos.z));
 
-            // Skip if container has no dimensions yet
-            if (containerWidth === 0 || containerHeight === 0) {
-                animationRef.current = requestAnimationFrame(updateCamera);
-                return;
-            }
-
-            const aspect = containerWidth / containerHeight;
-
-            // Virtual screen dimensions (the "window frame")
-            const screenHeight = screenSize;
-            const screenWidth = screenHeight * aspect;
-
-            // Frustum boundaries
-            const halfWidth = screenWidth / 2;
-            const halfHeight = screenHeight / 2;
-
-            // Near/far planes
-            const near = 0.1;
-            const far = 1000;
-
-            // Distance from eye to the focus plane (where objects appear "pinned" to screen)
-            const distToFocusPlane = Math.abs(safeEyeZ - focusDepth);
-            const safeDist = Math.max(distToFocusPlane, 0.5);
-
-            // Calculate off-axis frustum
-            // Objects at focusDepth will appear pinned to the screen
-            // Objects closer will appear to pop out, farther will appear behind
-            const left = (-halfWidth - eyeX) * near / safeDist;
-            const right = (halfWidth - eyeX) * near / safeDist;
-            const bottom = (-halfHeight - eyeY) * near / safeDist;
-            const top = (halfHeight - eyeY) * near / safeDist;
-
-            // Validate projection parameters - all must be finite and create valid frustum
-            if (!isFinite(left) || !isFinite(right) || !isFinite(bottom) || !isFinite(top) ||
-                left >= right || bottom >= top) {
-                // Skip this frame silently - can happen during initialization
-                animationRef.current = requestAnimationFrame(updateCamera);
-                return;
-            }
-
-            if (camera instanceof THREE.PerspectiveCamera) {
-                // Create the off-axis projection matrix
-                camera.projectionMatrix.makePerspective(left, right, top, bottom, near, far);
-                camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-
-                // Position camera at eye position
-                camera.position.set(eyeX, eyeY, safeEyeZ);
-
-                // Look at the focus point (where the "window" plane intersects scene)
-                camera.lookAt(cameraX, cameraY, focusDepth);
-                camera.updateMatrixWorld(true);
-            }
+            // Apply position and look at target
+            camera.position.copy(newPos);
+            camera.lookAt(base.target);
+            camera.updateMatrixWorld(true);
 
             animationRef.current = requestAnimationFrame(updateCamera);
         };
@@ -566,6 +514,8 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 cancelAnimationFrame(animationRef.current);
                 animationRef.current = null;
             }
+            // Clear base camera when leaving head tracking mode
+            baseCameraRef.current = null;
             if (import.meta.env.DEV) console.log('[SplatWindow] Stopped head tracking camera loop');
         };
     // Note: params removed from deps - we use paramsRef.current inside RAF for immediate updates

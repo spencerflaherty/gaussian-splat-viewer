@@ -438,17 +438,40 @@ async def run_sharp_with_progress(
         # Start reading stderr in background
         stderr_task = asyncio.create_task(read_stderr())
 
-        # Send periodic progress updates
+        # Send periodic progress updates with time-based simulation
+        # SHARP typically takes 30-120 seconds depending on image size
+        start_time = time.time()
+        last_progress = 0
+
         while not stderr_task.done():
             if job_id in cancelled_jobs:
                 process.terminate()
                 raise asyncio.CancelledError("Job cancelled by user")
 
+            # Calculate time-based progress (0-80% over ~60 seconds)
+            # This provides smooth visual feedback even if SHARP doesn't output progress
+            elapsed = time.time() - start_time
+            time_progress = min(80, int((elapsed / 60) * 80))
+
+            # Use the higher of time-based or parsed progress
+            display_progress = max(progress, time_progress, last_progress)
+            last_progress = display_progress
+
+            # Generate appropriate message based on progress
+            if display_progress < 20:
+                message = "Loading SHARP model..."
+            elif display_progress < 50:
+                message = "Processing image..."
+            elif display_progress < 70:
+                message = "Generating gaussians..."
+            else:
+                message = "Finalizing splat..."
+
             active_jobs[job_id] = JobStatus(
                 job_id=job_id,
                 stage=JobStage.PROCESSING,
-                progress=progress,
-                message="Running SHARP conversion..."
+                progress=display_progress,
+                message=message
             )
             yield format_sse_event("progress", asdict(active_jobs[job_id]))
             await asyncio.sleep(0.5)
@@ -745,6 +768,147 @@ async def convert_image(
                     print(f"[cleanup] Failed to clean up {directory}: {cleanup_error}")
 
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Cleanup Endpoints ====================
+
+@app.post("/cleanup/sharp-model")
+async def cleanup_sharp_model():
+    """
+    Delete the SHARP model cache (~2.6GB) from ~/.cache/torch/hub/checkpoints/
+    This frees up disk space but the model will need to re-download on next conversion.
+    """
+    import os
+    cache_dir = Path.home() / ".cache" / "torch" / "hub" / "checkpoints"
+
+    deleted_files = []
+    total_size = 0
+
+    if cache_dir.exists():
+        for f in cache_dir.iterdir():
+            if f.is_file() and 'sharp' in f.name.lower():
+                size = f.stat().st_size
+                total_size += size
+                f.unlink()
+                deleted_files.append(f.name)
+
+    return {
+        "status": "success",
+        "deleted_files": deleted_files,
+        "freed_bytes": total_size,
+        "freed_mb": round(total_size / (1024 * 1024), 2)
+    }
+
+
+@app.post("/cleanup/temp-files")
+async def cleanup_temp_files():
+    """
+    Delete all temporary upload and output files.
+    """
+    deleted_count = 0
+    total_size = 0
+
+    for directory in [UPLOAD_DIR, OUTPUT_DIR]:
+        if directory.exists():
+            for item in directory.iterdir():
+                if item.is_dir():
+                    size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
+                    total_size += size
+                    shutil.rmtree(item)
+                    deleted_count += 1
+                elif item.is_file():
+                    total_size += item.stat().st_size
+                    item.unlink()
+                    deleted_count += 1
+
+    return {
+        "status": "success",
+        "deleted_items": deleted_count,
+        "freed_bytes": total_size,
+        "freed_mb": round(total_size / (1024 * 1024), 2)
+    }
+
+
+@app.post("/cleanup/all")
+async def cleanup_all():
+    """
+    Full cleanup: delete SHARP model, temp files, and installation directory.
+    Returns instructions for completing cleanup (stopping servers, removing ~/.splat-window).
+    """
+    sharp_result = await cleanup_sharp_model()
+    temp_result = await cleanup_temp_files()
+
+    total_freed = sharp_result["freed_bytes"] + temp_result["freed_bytes"]
+
+    return {
+        "status": "success",
+        "sharp_cleanup": sharp_result,
+        "temp_cleanup": temp_result,
+        "total_freed_mb": round(total_freed / (1024 * 1024), 2),
+        "manual_steps": [
+            "To stop servers: Press Ctrl+C in the terminal running splat-viewer",
+            "To remove installation: rm -rf ~/.splat-window",
+            "To remove settings: Clear browser localStorage for this site"
+        ]
+    }
+
+
+@app.get("/status/storage")
+async def get_storage_status():
+    """
+    Get current storage usage for SHARP model and temp files.
+    """
+    import os
+
+    # Check SHARP model cache
+    cache_dir = Path.home() / ".cache" / "torch" / "hub" / "checkpoints"
+    sharp_size = 0
+    sharp_files = []
+
+    if cache_dir.exists():
+        for f in cache_dir.iterdir():
+            if f.is_file() and 'sharp' in f.name.lower():
+                size = f.stat().st_size
+                sharp_size += size
+                sharp_files.append({"name": f.name, "size_mb": round(size / (1024 * 1024), 2)})
+
+    # Check temp directories
+    temp_size = 0
+    temp_count = 0
+
+    for directory in [UPLOAD_DIR, OUTPUT_DIR]:
+        if directory.exists():
+            for item in directory.rglob('*'):
+                if item.is_file():
+                    temp_size += item.stat().st_size
+                    temp_count += 1
+
+    # Check installation directory
+    install_dir = Path.home() / ".splat-window"
+    install_size = 0
+
+    if install_dir.exists():
+        for item in install_dir.rglob('*'):
+            if item.is_file():
+                install_size += item.stat().st_size
+
+    return {
+        "sharp_model": {
+            "size_mb": round(sharp_size / (1024 * 1024), 2),
+            "files": sharp_files,
+            "installed": len(sharp_files) > 0
+        },
+        "temp_files": {
+            "size_mb": round(temp_size / (1024 * 1024), 2),
+            "file_count": temp_count
+        },
+        "installation": {
+            "size_mb": round(install_size / (1024 * 1024), 2),
+            "path": str(install_dir),
+            "exists": install_dir.exists()
+        },
+        "total_size_mb": round((sharp_size + temp_size + install_size) / (1024 * 1024), 2)
+    }
 
 
 if __name__ == "__main__":
