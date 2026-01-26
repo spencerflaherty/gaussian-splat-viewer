@@ -657,7 +657,7 @@ server: {
 | Head tracking doesn't work | Camera denied | Check browser permissions |
 | Depth (Z) not working | Calibration needed | Wait 1-2 seconds for baseline calibration; check console for "Baseline face width calibrated" |
 | Axis movement reversed | Need to flip axis | Use Flip X/Y/Z buttons in Settings panel |
-| Conversion stuck at 80% | SHARP still processing | This is normal - SHARP takes 60-120s for large images |
+| Progress slow at 70-79% | SHARP still processing | Normal for large images at 100% quality - uses asymptotic progress that never exceeds 79% until complete |
 | "Separator not found" error | SSE stream issue | Retry the conversion; may be a network hiccup |
 
 ### Console Message Sequence (Successful Load)

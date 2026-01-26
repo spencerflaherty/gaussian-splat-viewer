@@ -441,7 +441,7 @@ async def run_sharp_with_progress(
         stderr_task = asyncio.create_task(read_stderr())
 
         # Send periodic progress updates with time-based simulation
-        # SHARP typically takes 30-120 seconds depending on image size
+        # SHARP typically takes 60-180 seconds depending on image size and quality
         start_time = time.time()
         last_progress = 0
 
@@ -450,24 +450,30 @@ async def run_sharp_with_progress(
                 process.terminate()
                 raise asyncio.CancelledError("Job cancelled by user")
 
-            # Calculate time-based progress (0-80% over ~60 seconds)
-            # This provides smooth visual feedback even if SHARP doesn't output progress
+            # Calculate time-based progress using asymptotic function
+            # This approaches but never reaches 80% until SHARP completes
+            # Formula: progress = 80 * (1 - e^(-elapsed/120))
+            # At 60s: ~33%, at 120s: ~50%, at 180s: ~63%, at 240s: ~72%
             elapsed = time.time() - start_time
-            time_progress = min(80, int((elapsed / 60) * 80))
+            time_progress = int(80 * (1 - 2.718281828 ** (-elapsed / 120)))
 
             # Use the higher of time-based or parsed progress
             display_progress = max(progress, time_progress, last_progress)
+            # Cap at 79% - never hit 80% until SHARP actually completes
+            display_progress = min(79, display_progress)
             last_progress = display_progress
 
             # Generate appropriate message based on progress
-            if display_progress < 20:
+            if display_progress < 15:
                 message = "Loading SHARP model..."
-            elif display_progress < 50:
+            elif display_progress < 35:
                 message = "Processing image..."
-            elif display_progress < 70:
+            elif display_progress < 55:
                 message = "Generating gaussians..."
+            elif display_progress < 70:
+                message = "Refining splats..."
             else:
-                message = "Finalizing splat..."
+                message = "Finalizing output..."
 
             active_jobs[job_id] = JobStatus(
                 job_id=job_id,
