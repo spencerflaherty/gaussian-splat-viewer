@@ -1,9 +1,91 @@
 import { createPortal } from 'react-dom';
+import { useState, useEffect, useRef } from 'react';
 import { LiquidGlass } from '../ui/LiquidGlass';
 import { ModeSwitcher } from './ModeSwitcher';
 import { SettingsPanel } from './SettingsPanel';
 import { CalibrationWizard } from './CalibrationWizard';
 import type { CameraPositionData } from '../viewer/SplatViewer';
+
+/** Editable number input that doesn't get overwritten while typing */
+function EditableNumberInput({
+  value,
+  onChange,
+  step = 0.1,
+  label
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  label: string;
+}) {
+  const [localValue, setLocalValue] = useState(value.toFixed(2));
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync from prop when not focused
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(value.toFixed(2));
+    }
+  }, [value, isFocused]);
+
+  const applyValue = () => {
+    const parsed = parseFloat(localValue);
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+    } else {
+      setLocalValue(value.toFixed(2)); // Reset to current value
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+      <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>{label}:</span>
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="decimal"
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => {
+          setIsFocused(false);
+          applyValue();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            applyValue();
+            inputRef.current?.blur();
+          }
+          if (e.key === 'Escape') {
+            setLocalValue(value.toFixed(2));
+            inputRef.current?.blur();
+          }
+          // Arrow key increment/decrement
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const newVal = (parseFloat(localValue) || 0) + step;
+            setLocalValue(newVal.toFixed(2));
+            onChange(newVal);
+          }
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const newVal = (parseFloat(localValue) || 0) - step;
+            setLocalValue(newVal.toFixed(2));
+            onChange(newVal);
+          }
+        }}
+        style={{
+          flex: 1, marginLeft: 8, padding: '4px 8px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+          border: isFocused ? '1px solid #007AFF' : '1px solid rgba(0,0,0,0.15)',
+          borderRadius: 4, background: 'rgba(255,255,255,0.9)',
+          outline: 'none', width: 90,
+          boxShadow: isFocused ? '0 0 0 2px rgba(0,122,255,0.2)' : 'none',
+        }}
+      />
+    </div>
+  );
+}
 
 export interface HUDOverlayProps {
   showControls: boolean;
@@ -81,102 +163,45 @@ export function HUDOverlay({
               Camera Position
             </div>
             <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 12 }}>
-              {/* Camera X */}
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>X:</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={cameraPosition.x.toFixed(2)}
-                  onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, x: parseFloat(e.target.value) || 0 })}
-                  style={{
-                    flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
-                    border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
-                    width: 80,
-                  }}
-                />
-              </div>
-              {/* Camera Y */}
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Y:</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={cameraPosition.y.toFixed(2)}
-                  onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, y: parseFloat(e.target.value) || 0 })}
-                  style={{
-                    flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
-                    border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
-                    width: 80,
-                  }}
-                />
-              </div>
-              {/* Camera Z */}
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Z:</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={cameraPosition.z.toFixed(2)}
-                  onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, z: parseFloat(e.target.value) || 0 })}
-                  style={{
-                    flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
-                    border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
-                    width: 80,
-                  }}
-                />
-              </div>
+              <EditableNumberInput
+                label="X"
+                value={cameraPosition.x}
+                onChange={(v) => onSetCameraPosition?.({ ...cameraPosition, x: v })}
+              />
+              <EditableNumberInput
+                label="Y"
+                value={cameraPosition.y}
+                onChange={(v) => onSetCameraPosition?.({ ...cameraPosition, y: v })}
+              />
+              <EditableNumberInput
+                label="Z"
+                value={cameraPosition.z}
+                onChange={(v) => onSetCameraPosition?.({ ...cameraPosition, z: v })}
+              />
             </div>
             <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', marginTop: 8, paddingTop: 8 }}>
               <div style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.35)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
                 Look At
               </div>
               <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 12 }}>
-                {/* Target X */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>X:</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={cameraPosition.targetX.toFixed(2)}
-                    onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, targetX: parseFloat(e.target.value) || 0 })}
-                    style={{
-                      flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
-                      border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
-                      width: 80,
-                    }}
-                  />
-                </div>
-                {/* Target Y */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Y:</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={cameraPosition.targetY.toFixed(2)}
-                    onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, targetY: parseFloat(e.target.value) || 0 })}
-                    style={{
-                      flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
-                      border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
-                      width: 80,
-                    }}
-                  />
-                </div>
-                {/* Target Z */}
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Z:</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={cameraPosition.targetZ.toFixed(2)}
-                    onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, targetZ: parseFloat(e.target.value) || 0 })}
-                    style={{
-                      flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
-                      border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
-                      width: 80,
-                    }}
-                  />
-                </div>
+                <EditableNumberInput
+                  label="X"
+                  value={cameraPosition.targetX}
+                  step={1}
+                  onChange={(v) => onSetCameraPosition?.({ ...cameraPosition, targetX: v })}
+                />
+                <EditableNumberInput
+                  label="Y"
+                  value={cameraPosition.targetY}
+                  step={1}
+                  onChange={(v) => onSetCameraPosition?.({ ...cameraPosition, targetY: v })}
+                />
+                <EditableNumberInput
+                  label="Z"
+                  value={cameraPosition.targetZ}
+                  step={1}
+                  onChange={(v) => onSetCameraPosition?.({ ...cameraPosition, targetZ: v })}
+                />
               </div>
             </div>
           </LiquidGlass>

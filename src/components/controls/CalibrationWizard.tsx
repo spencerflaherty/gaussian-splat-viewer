@@ -34,7 +34,7 @@ export function CalibrationWizard({
   return (
     <div style={{
       position: 'absolute',
-      top: 70,
+      top: 290, // Below camera position box
       right: 16,
       opacity: visible ? 1 : 0,
       transition: 'opacity 0.3s ease',

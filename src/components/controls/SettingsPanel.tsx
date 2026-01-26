@@ -14,27 +14,60 @@ const SLIDER_CONFIG: Record<string, {
   label: string;
   minLabel?: string;
   maxLabel?: string;
-  defaultValue?: number; // For reference in UI
+  defaultValue?: number;
+  description?: string;
 }> = {
   // Motion settings - ranges centered around defaults
-  // Default sensitivity: 0.01 -> range 0 to 0.02 puts default at 50%
-  sensitivity: { min: 0, max: 0.02, step: 0.001, label: 'Movement Scale', minLabel: 'None', maxLabel: 'Strong', defaultValue: 0.01 },
-  // Default depthSensitivity: 0.05 -> range 0 to 0.1 puts default at 50%
-  depthSensitivity: { min: 0, max: 0.1, step: 0.005, label: 'Zoom Effect', minLabel: 'Off', maxLabel: 'Strong', defaultValue: 0.05 },
+  sensitivity: {
+    min: 0, max: 0.02, step: 0.001,
+    label: 'Movement Scale',
+    minLabel: 'None', maxLabel: 'Strong',
+    defaultValue: 0.01,
+    description: 'How much camera moves in response to your head movement. Higher = more parallax effect.',
+  },
+  depthSensitivity: {
+    min: 0, max: 0.1, step: 0.005,
+    label: 'Zoom Effect',
+    minLabel: 'Off', maxLabel: 'Strong',
+    defaultValue: 0.05,
+    description: 'Camera zooms in/out as you move closer/farther from screen. Based on face width detection.',
+  },
 
   // Camera offsets - ranges centered around defaults
-  // Default cameraX: 0.10 -> range -0.4 to 0.6 puts default at 50%
-  cameraX: { min: -0.4, max: 0.6, step: 0.01, label: 'X Offset', defaultValue: 0.10 },
-  // Default cameraY: 0 -> range -0.5 to 0.5 puts default at 50%
-  cameraY: { min: -0.5, max: 0.5, step: 0.01, label: 'Y Offset', defaultValue: 0 },
-  // Default cameraZ: -0.50 -> range -1.0 to 0 puts default at 50%
-  cameraZ: { min: -1.0, max: 0, step: 0.01, label: 'Z Offset', defaultValue: -0.50 },
+  cameraX: {
+    min: -0.4, max: 0.6, step: 0.01,
+    label: 'X Offset',
+    defaultValue: 0.10,
+    description: 'Shifts the scene left or right. Use to center objects that appear off to one side.',
+  },
+  cameraY: {
+    min: -0.5, max: 0.5, step: 0.01,
+    label: 'Y Offset',
+    defaultValue: 0,
+    description: 'Shifts the scene up or down. Use to center objects that appear too high or low.',
+  },
+  cameraZ: {
+    min: -1.0, max: 0, step: 0.01,
+    label: 'Z Offset',
+    defaultValue: -0.50,
+    description: 'Moves camera closer or farther from scene. Negative values pull camera back.',
+  },
 
   // Smoothing - ranges centered around defaults
-  // Default smoothing: 0.15 -> range 0.05 to 0.25 puts default at 50%
-  smoothing: { min: 0.05, max: 0.25, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth', defaultValue: 0.15 },
-  // Default deadZone: 0.005 -> range 0 to 0.01 puts default at 50%
-  deadZone: { min: 0, max: 0.01, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large', defaultValue: 0.005 },
+  smoothing: {
+    min: 0.05, max: 0.25, step: 0.01,
+    label: 'Smoothing',
+    minLabel: 'Responsive', maxLabel: 'Smooth',
+    defaultValue: 0.15,
+    description: 'Lower = faster response to head movement. Higher = smoother but more delayed.',
+  },
+  deadZone: {
+    min: 0, max: 0.01, step: 0.001,
+    label: 'Dead Zone',
+    minLabel: 'None', maxLabel: 'Large',
+    defaultValue: 0.005,
+    description: 'Ignores tiny movements below this threshold. Helps reduce jitter from tracking noise.',
+  },
 };
 
 // Only use these for numeric params
@@ -50,19 +83,36 @@ const RENDERER_SLIDER_CONFIG: Record<string, {
   minLabel?: string;
   maxLabel?: string;
   defaultValue?: number;
+  description?: string;
 }> = {
-  // Focal adjustment - affects perceived depth/size of splats
-  // 1.0 = Spark default, 2.0 = match PlayCanvas renderer
-  focalAdjustment: { min: 0.5, max: 3.0, step: 0.1, label: 'Focal Adjustment', minLabel: 'Compressed', maxLabel: 'Stretched', defaultValue: 1.0 },
-  // Max standard deviation - controls maximum splat size
-  // √8 ≈ 2.83 is Spark default
-  maxStdDev: { min: 1.0, max: 5.0, step: 0.1, label: 'Splat Size (Max)', minLabel: 'Small', maxLabel: 'Large', defaultValue: Math.sqrt(8) },
-  // Blur amount - anti-aliasing for smoother edges
-  // 0 = sharp, 0.3 = typical AA, higher = softer
-  blurAmount: { min: 0, max: 1.0, step: 0.05, label: 'Edge Blur', minLabel: 'Sharp', maxLabel: 'Soft', defaultValue: 0 },
-  // Falloff - splat shape from flat to gaussian
-  // 0 = flat disc, 1 = normal gaussian kernel
-  falloff: { min: 0, max: 1.0, step: 0.1, label: 'Splat Falloff', minLabel: 'Flat', maxLabel: 'Gaussian', defaultValue: 1.0 },
+  focalAdjustment: {
+    min: 0.5, max: 3.0, step: 0.1,
+    label: 'Focal Adjustment',
+    minLabel: 'Compressed', maxLabel: 'Stretched',
+    defaultValue: 1.0,
+    description: 'Controls perceived depth. Lower compresses depth (flatter), higher stretches it. Try 2.0 to match PlayCanvas.',
+  },
+  maxStdDev: {
+    min: 1.0, max: 5.0, step: 0.1,
+    label: 'Splat Size (Max)',
+    minLabel: 'Small', maxLabel: 'Large',
+    defaultValue: Math.sqrt(8),
+    description: 'Maximum size of individual splats. Smaller = sharper details but may show gaps. Larger = softer, more coverage.',
+  },
+  blurAmount: {
+    min: 0, max: 1.0, step: 0.05,
+    label: 'Edge Blur',
+    minLabel: 'Sharp', maxLabel: 'Soft',
+    defaultValue: 0,
+    description: 'Anti-aliasing for splat edges. 0 = crisp pixels, higher = smoother but softer appearance.',
+  },
+  falloff: {
+    min: 0, max: 1.0, step: 0.1,
+    label: 'Splat Falloff',
+    minLabel: 'Flat', maxLabel: 'Gaussian',
+    defaultValue: 1.0,
+    description: 'Splat opacity gradient. 0 = flat discs with hard edges. 1 = natural gaussian falloff (softer blend).',
+  },
 };
 
 export interface SettingsPanelProps {
@@ -118,6 +168,7 @@ export function SettingsPanel({
         onChange={(newValue) => updateParam(param, newValue)}
         minLabel={config.minLabel}
         maxLabel={config.maxLabel}
+        description={config.description}
       />
     );
   };
@@ -140,6 +191,7 @@ export function SettingsPanel({
         onChange={(newValue) => updateRendererSetting(param, newValue)}
         minLabel={config.minLabel}
         maxLabel={config.maxLabel}
+        description={config.description}
       />
     );
   };

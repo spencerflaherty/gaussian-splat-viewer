@@ -1,4 +1,4 @@
-import type { CSSProperties, ChangeEvent } from 'react';
+import { useState, type CSSProperties, type ChangeEvent, useRef } from 'react';
 
 export interface SliderProps {
   /** Label to display above the slider */
@@ -21,6 +21,8 @@ export interface SliderProps {
   minLabel?: string;
   /** Label for maximum end (e.g., "Dramatic") */
   maxLabel?: string;
+  /** Description shown in info tooltip */
+  description?: string;
 }
 
 /**
@@ -41,7 +43,11 @@ export function Slider({
   style,
   minLabel,
   maxLabel,
+  description,
 }: SliderProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
   const handleTextChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
@@ -69,15 +75,67 @@ export function Slider({
           marginBottom: 6,
         }}
       >
-        <span
-          style={{
-            fontSize: 13,
-            color: 'rgba(0, 0, 0, 0.85)',
-            fontWeight: 500,
-          }}
-        >
-          {label}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+          <span
+            style={{
+              fontSize: 13,
+              color: 'rgba(0, 0, 0, 0.85)',
+              fontWeight: 500,
+            }}
+          >
+            {label}
+          </span>
+          {description && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowTooltip(!showTooltip)}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'rgba(0, 0, 0, 0.08)',
+                  color: 'rgba(0, 0, 0, 0.4)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                ?
+              </button>
+              {showTooltip && (
+                <div
+                  ref={tooltipRef}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: 6,
+                    padding: '8px 12px',
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    color: 'white',
+                    fontSize: 11,
+                    lineHeight: 1.4,
+                    borderRadius: 8,
+                    maxWidth: 220,
+                    zIndex: 1000,
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  }}
+                >
+                  {description}
+                </div>
+              )}
+            </>
+          )}
+        </div>
         <input
           type="number"
           step={step}

@@ -308,9 +308,10 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                         if (import.meta.env.DEV) console.log('[SplatWindow] Scene bounds:', { center: center.toArray(), size: size.toArray(), maxDim });
 
                         // For SHARP PLY files, recreate the original image perspective
-                        // SHARP reconstructs from a single image with camera at origin
-                        // After 180° X rotation, scene is flipped
-                        // The bounding box X/Z can be skewed by sky/background, but Y center is usually reliable
+                        // Based on user testing, the correct camera position is:
+                        // - Camera at or very near origin (0, 0, 0)
+                        // - Looking INTO negative Z (where the scene content is)
+                        // SHARP reconstructs depth into negative Z after our 180° X rotation
                         if (format === 'ply') {
                             // Log raw bounds for debugging
                             if (import.meta.env.DEV) console.log('[SplatWindow] Raw bounding box:', {
@@ -320,26 +321,19 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                                 size: size.toArray()
                             });
 
-                            // The content is at the bounding box center, but we need to position
-                            // the camera to look at it from the "front" (original photo perspective)
+                            // Camera position: at origin (matching original camera perspective)
+                            // Tested values: Camera (0.01, 0.02, -0.04), Look At (0.78, 0.00, -40.06)
+                            const camPos = new THREE.Vector3(0, 0, 0);
 
-                            // Use center Y (where content actually is)
-                            // For X and Z, the center should be close to where we want to look
-                            const targetY = center.y;
+                            // Look at: into the scene along negative Z
+                            // Use center X for horizontal centering, Y=0 for vertical,
+                            // and somewhere in the middle of the Z range for depth
                             const targetX = center.x;
-
-                            // For Z: content extends into negative Z, we want to look at the "middle" of it
-                            // Use a point between the front (max.z) and back (min.z) of the scene
-                            const targetZ = box.max.z - size.z * 0.3; // Look at the front third of the scene
+                            const targetY = 0; // Keep vertical at 0 for natural view
+                            // Look at roughly the middle depth of the scene (negative Z)
+                            const targetZ = (box.min.z + box.max.z) / 2;
 
                             const lookAt = new THREE.Vector3(targetX, targetY, targetZ);
-
-                            // Camera distance based on scene height (most reliable for framing)
-                            // Position camera in front of the target (higher Z)
-                            const viewDistance = Math.max(size.y * 1.2, size.x * 1.2, 5);
-                            const camZ = targetZ + viewDistance;
-
-                            const camPos = new THREE.Vector3(targetX, targetY, camZ);
 
                             camera.position.copy(camPos);
                             camera.lookAt(lookAt);
@@ -357,12 +351,11 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                                 target: lookAt.clone(),
                             };
 
-                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera positioned for PLY:', {
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera positioned for PLY (origin-based):', {
                                 cameraPos: camPos.toArray(),
                                 lookAt: lookAt.toArray(),
-                                viewDistance,
-                                sizeY: size.y,
-                                sizeX: size.x
+                                sceneMinZ: box.min.z,
+                                sceneMaxZ: box.max.z
                             });
                         } else if (maxDim > 0 && isFinite(maxDim)) {
                             // For .splat files, use bounding box center
@@ -631,10 +624,14 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
             );
 
             // Clamp to reasonable bounds to prevent extreme positions
-            const maxOffset = distToTarget * 2;
+            const maxOffset = distToTarget * 0.5; // Limit movement to 50% of distance to target
             newPos.x = Math.max(base.position.x - maxOffset, Math.min(base.position.x + maxOffset, newPos.x));
             newPos.y = Math.max(base.position.y - maxOffset, Math.min(base.position.y + maxOffset, newPos.y));
-            newPos.z = Math.max(0.5, Math.min(base.position.z + maxOffset, newPos.z));
+            // For Z, allow movement toward target but not past it, and not too far back
+            // Don't hardcode 0.5 minimum - base Z might be at/near 0 looking into negative Z
+            const minZ = base.position.z - maxOffset; // Can move toward target
+            const maxZ = base.position.z + maxOffset; // But not too far back
+            newPos.z = Math.max(minZ, Math.min(maxZ, newPos.z));
 
             // Apply position and look at target
             camera.position.copy(newPos);
