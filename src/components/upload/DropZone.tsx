@@ -106,7 +106,7 @@ export function DropZone({
               </p>
 
               {/* Backend Status Indicator */}
-              <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center' }}>
+              <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                 <div style={{
                   padding: '6px 14px',
                   borderRadius: 20,
@@ -138,9 +138,21 @@ export function DropZone({
                         ? '#FF9500'
                         : '#FF3B30',
                   }}>
-                    {backendStatus === 'online' ? 'Ready' : backendStatus === 'checking' ? 'Connecting...' : 'Offline'}
+                    {backendStatus === 'online' ? 'Ready' : backendStatus === 'checking' ? 'Connecting...' : 'Viewer Only'}
                   </span>
                 </div>
+
+                {/* Viewer Only hint */}
+                {backendStatus === 'offline' && (
+                  <p style={{
+                    fontSize: 12,
+                    color: 'rgba(0, 0, 0, 0.4)',
+                    margin: 0,
+                    textAlign: 'center',
+                  }}>
+                    .splat and .ply files only
+                  </p>
+                )}
               </div>
             </>
           ) : (

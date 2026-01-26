@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useHeadTracking } from './hooks/useHeadTracking';
+import { useBackendStatus } from './hooks/useBackendStatus';
 import { SplatViewer } from './components/viewer/SplatViewer';
 import { HUDOverlay } from './components/controls/HUD';
 import { DropZone } from './components/upload/DropZone';
 import { ConversionProgress } from './components/upload/ConversionProgress';
+import { SetupModal } from './components/upload/SetupModal';
 import { useSettingsStore, useViewerStore } from './stores';
 
 const HAS_SEEN_SETTINGS_KEY = 'splat-viewer-has-seen-settings';
@@ -32,7 +34,6 @@ function App() {
     showControls,
     showSettings,
     darkBackground,
-    backendStatus,
     setSplat,
     setControlMode,
     setProcessingStage,
@@ -40,9 +41,11 @@ function App() {
     setShowControls,
     setShowSettings,
     setDarkBackground,
-    setBackendStatus,
     reset,
   } = useViewerStore();
+
+  // Backend status hook
+  const { status: backendStatus } = useBackendStatus();
 
   // Head tracking with params from settings store
   // Only enable when in head tracking mode to lazy-load MediaPipe
@@ -63,6 +66,9 @@ function App() {
   // State for streaming conversion
   const [convertingFile, setConvertingFile] = useState<File | null>(null);
 
+  // State for setup modal
+  const [showSetupModal, setShowSetupModal] = useState(false);
+
   // Show settings panel on first use when entering head tracking mode
   useEffect(() => {
     if (controlMode === 'head' && splatUrl && !hasCheckedSettingsRef.current) {
@@ -78,24 +84,6 @@ function App() {
       }
     }
   }, [controlMode, splatUrl, setShowSettings]);
-
-  // Backend health check
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        const response = await fetch(`${BACKEND_URL}/`, { method: 'GET', signal: controller.signal });
-        clearTimeout(timeoutId);
-        setBackendStatus(response.ok ? 'online' : 'offline');
-      } catch {
-        setBackendStatus('offline');
-      }
-    };
-    checkBackend();
-    const interval = setInterval(checkBackend, 10000);
-    return () => clearInterval(interval);
-  }, [setBackendStatus]);
 
   // Auto-hide controls timer
   const resetControlsTimer = useCallback(() => {
@@ -150,7 +138,8 @@ function App() {
       setSplat(URL.createObjectURL(file), 'ply', file.name);
     } else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
       if (backendStatus !== 'online') {
-        setError('Backend required. Run ./start.sh');
+        // Show setup modal instead of error
+        setShowSetupModal(true);
         processingRef.current = false;
         return;
       }
@@ -288,6 +277,12 @@ function App() {
           highlightSettings={highlightSettings}
         />
       )}
+
+      {/* Setup Modal for backend installation */}
+      <SetupModal
+        isOpen={showSetupModal}
+        onClose={() => setShowSetupModal(false)}
+      />
     </div>
   );
 }
