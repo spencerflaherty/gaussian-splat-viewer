@@ -262,26 +262,30 @@ Work through EXECUTION_PLAN.md systematically. Complete each task, validate it w
 **Validation:** temp_uploads and temp_outputs stay clean ✅
 
 ### Task 5.2: Implement SSE Streaming Endpoint
-- [ ] Create `/convert-stream` endpoint
-- [ ] Use asyncio subprocess
-- [ ] Parse SHARP stderr for progress
-- [ ] Yield SSE events
+- [x] Create `/convert-stream` endpoint
+- [x] Use asyncio subprocess
+- [x] Parse SHARP stderr for progress
+- [x] Yield SSE events
+- [x] Add `/job/{job_id}/result` endpoint to download completed PLY
+- [x] Add `/job/{job_id}/cancel` endpoint
+- [x] Add `/job/{job_id}/status` endpoint
 
-**Validation:** Can curl endpoint and see progress events
+**Validation:** Can curl endpoint and see progress events ✅
 
 ### Task 5.3: Create ConversionProgress Component
-- [ ] Create `src/components/upload/ConversionProgress.tsx`
-- [ ] Connect to SSE endpoint
-- [ ] Show stage, progress bar, ETA
+- [x] Create `src/components/upload/ConversionProgress.tsx`
+- [x] Connect to SSE endpoint
+- [x] Show stage, progress bar, ETA
+- [x] Integrate into App.tsx
 
-**Validation:** Progress updates in real-time during conversion
+**Validation:** Progress updates in real-time during conversion ✅
 
 ### Task 5.4: Add Cancel Support
-- [ ] Frontend can abort conversion
-- [ ] Backend kills subprocess on disconnect
-- [ ] Clean up partial files
+- [x] Frontend can abort conversion (abort controller in ConversionProgress)
+- [x] Backend kills subprocess on disconnect (cancelled_jobs set + process.terminate())
+- [x] Clean up partial files (cleanup in error handler)
 
-**Validation:** Cancel button stops conversion
+**Validation:** Cancel button stops conversion ✅
 
 ---
 
@@ -476,7 +480,7 @@ npm run dev
 | Phase 2: State Management | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 3: Settings UX | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 4: Performance | Complete | 2025-01-25 | 2025-01-25 |
-| Phase 5: Backend | Not Started | | |
+| Phase 5: Backend | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 6: CSS Consolidation | Not Started | | |
 | Phase 7: Input Abstraction | Not Started | | |
 | Phase 8: Animation Export | Not Started | | |

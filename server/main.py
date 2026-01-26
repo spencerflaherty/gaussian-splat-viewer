@@ -1,14 +1,20 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 import subprocess
 import shutil
 import time
 import sys
 import struct
+import json
+import re
+import uuid
 import numpy as np
 from pathlib import Path
 import asyncio
+from typing import AsyncGenerator, Dict, Optional
+from dataclasses import dataclass, asdict
+from enum import Enum
 
 app = FastAPI()
 
@@ -29,6 +35,32 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 # Cleanup settings
 CLEANUP_AFTER_SECONDS = 3600  # 1 hour
 CLEANUP_INTERVAL_SECONDS = 600  # Run cleanup every 10 minutes
+
+
+# Job tracking for SSE streaming
+class JobStage(str, Enum):
+    UPLOADING = "uploading"
+    PROCESSING = "processing"
+    CLEANING = "cleaning"
+    DOWNSAMPLING = "downsampling"
+    COMPLETE = "complete"
+    ERROR = "error"
+
+
+@dataclass
+class JobStatus:
+    job_id: str
+    stage: JobStage
+    progress: int  # 0-100
+    message: str
+    output_file: Optional[str] = None
+    error: Optional[str] = None
+
+
+# Active jobs storage (in-memory for simplicity)
+active_jobs: Dict[str, JobStatus] = {}
+# Cancelled jobs
+cancelled_jobs: set = set()
 
 
 def cleanup_job_directory(job_id: str):
@@ -327,6 +359,287 @@ def downsample_ply(input_path: Path, output_path: Path, keep_percentage: int):
     return output_path
 
 
+def format_sse_event(event: str, data: dict) -> str:
+    """Format data as Server-Sent Event."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+async def run_sharp_with_progress(
+    job_id: str,
+    job_input_dir: Path,
+    job_output_dir: Path,
+    quality: int
+) -> AsyncGenerator[str, None]:
+    """
+    Run SHARP conversion with progress streaming via SSE.
+    Parses stderr for progress updates.
+    """
+    # Get the path to the sharp command
+    venv_bin = Path(sys.executable).parent
+    sharp_cmd = venv_bin / "sharp"
+
+    cmd = [
+        str(sharp_cmd), "predict",
+        "-i", str(job_input_dir),
+        "-o", str(job_output_dir)
+    ]
+
+    print(f"[SSE] Running: {' '.join(cmd)}")
+
+    # Update job status
+    active_jobs[job_id] = JobStatus(
+        job_id=job_id,
+        stage=JobStage.PROCESSING,
+        progress=0,
+        message="Starting SHARP conversion..."
+    )
+    yield format_sse_event("progress", asdict(active_jobs[job_id]))
+
+    try:
+        # Run subprocess with async pipes
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(Path.cwd())
+        )
+
+        # Track progress from stderr
+        progress = 0
+        stderr_output = []
+
+        async def read_stderr():
+            nonlocal progress
+            while True:
+                line = await process.stderr.readline()
+                if not line:
+                    break
+                line_text = line.decode('utf-8', errors='ignore').strip()
+                stderr_output.append(line_text)
+                print(f"[SHARP] {line_text}")
+
+                # Check for cancellation
+                if job_id in cancelled_jobs:
+                    process.terminate()
+                    raise asyncio.CancelledError("Job cancelled by user")
+
+                # Parse progress from SHARP output
+                # SHARP typically outputs progress like "Processing: 50%" or similar
+                progress_match = re.search(r'(\d+)%', line_text)
+                if progress_match:
+                    progress = int(progress_match.group(1))
+                elif 'loading' in line_text.lower():
+                    progress = 10
+                elif 'predicting' in line_text.lower() or 'processing' in line_text.lower():
+                    progress = min(progress + 5, 80)
+                elif 'saving' in line_text.lower():
+                    progress = 85
+
+        # Start reading stderr in background
+        stderr_task = asyncio.create_task(read_stderr())
+
+        # Send periodic progress updates
+        while not stderr_task.done():
+            if job_id in cancelled_jobs:
+                process.terminate()
+                raise asyncio.CancelledError("Job cancelled by user")
+
+            active_jobs[job_id] = JobStatus(
+                job_id=job_id,
+                stage=JobStage.PROCESSING,
+                progress=progress,
+                message="Running SHARP conversion..."
+            )
+            yield format_sse_event("progress", asdict(active_jobs[job_id]))
+            await asyncio.sleep(0.5)
+
+        # Wait for process to complete
+        await stderr_task
+        await process.wait()
+
+        if process.returncode != 0:
+            stderr_text = '\n'.join(stderr_output)
+            raise Exception(f"SHARP failed with code {process.returncode}: {stderr_text}")
+
+        print("[SSE] SHARP completed successfully")
+
+        # Find the output PLY file
+        files = list(job_output_dir.glob("*.ply"))
+        if not files:
+            files = list(job_output_dir.rglob("*.ply"))
+        if not files:
+            raise Exception("No PLY file generated")
+
+        raw_ply = files[0]
+
+        # Cleaning stage
+        active_jobs[job_id] = JobStatus(
+            job_id=job_id,
+            stage=JobStage.CLEANING,
+            progress=90,
+            message="Cleaning PLY file..."
+        )
+        yield format_sse_event("progress", asdict(active_jobs[job_id]))
+
+        cleaned_ply = job_output_dir / f"cleaned_{raw_ply.name}"
+        clean_ply_for_viewer(raw_ply, cleaned_ply)
+
+        # Downsampling stage (if needed)
+        if quality < 100:
+            active_jobs[job_id] = JobStatus(
+                job_id=job_id,
+                stage=JobStage.DOWNSAMPLING,
+                progress=95,
+                message=f"Downsampling to {quality}%..."
+            )
+            yield format_sse_event("progress", asdict(active_jobs[job_id]))
+
+            downsampled_ply = job_output_dir / f"downsampled_{raw_ply.name}"
+            downsample_ply(cleaned_ply, downsampled_ply, quality)
+            output_file = downsampled_ply
+        else:
+            output_file = cleaned_ply
+
+        # Complete
+        active_jobs[job_id] = JobStatus(
+            job_id=job_id,
+            stage=JobStage.COMPLETE,
+            progress=100,
+            message="Conversion complete!",
+            output_file=str(output_file)
+        )
+        yield format_sse_event("complete", asdict(active_jobs[job_id]))
+
+    except asyncio.CancelledError:
+        active_jobs[job_id] = JobStatus(
+            job_id=job_id,
+            stage=JobStage.ERROR,
+            progress=0,
+            message="Conversion cancelled",
+            error="Cancelled by user"
+        )
+        yield format_sse_event("error", asdict(active_jobs[job_id]))
+        # Cleanup
+        for directory in [job_input_dir, job_output_dir]:
+            if directory.exists():
+                shutil.rmtree(directory)
+    except Exception as e:
+        print(f"[SSE] Error: {e}")
+        active_jobs[job_id] = JobStatus(
+            job_id=job_id,
+            stage=JobStage.ERROR,
+            progress=0,
+            message="Conversion failed",
+            error=str(e)
+        )
+        yield format_sse_event("error", asdict(active_jobs[job_id]))
+
+
+@app.post("/convert-stream")
+async def convert_image_stream(
+    file: UploadFile = File(...),
+    quality: int = Form(default=100),
+):
+    """
+    Convert image to PLY with SSE progress streaming.
+    Returns an SSE stream with progress events.
+    Final event includes the job_id to fetch the result.
+    """
+    # Clamp quality
+    quality = max(5, min(100, quality))
+
+    # Generate unique job ID
+    job_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    job_input_dir = UPLOAD_DIR / job_id
+    job_output_dir = OUTPUT_DIR / job_id
+
+    job_input_dir.mkdir(parents=True, exist_ok=True)
+    job_output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save uploaded file
+    input_path = job_input_dir / file.filename
+    with open(input_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    print(f"[SSE] Saved file: {input_path}, quality: {quality}%")
+
+    # Initialize job status
+    active_jobs[job_id] = JobStatus(
+        job_id=job_id,
+        stage=JobStage.UPLOADING,
+        progress=0,
+        message="File uploaded, starting conversion..."
+    )
+
+    async def generate():
+        async for event in run_sharp_with_progress(job_id, job_input_dir, job_output_dir, quality):
+            yield event
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+@app.get("/job/{job_id}/result")
+async def get_job_result(job_id: str, background_tasks: BackgroundTasks = None):
+    """
+    Download the result of a completed conversion job.
+    """
+    if job_id not in active_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = active_jobs[job_id]
+
+    if job.stage != JobStage.COMPLETE:
+        raise HTTPException(status_code=400, detail=f"Job not complete. Current stage: {job.stage}")
+
+    if not job.output_file:
+        raise HTTPException(status_code=500, detail="No output file available")
+
+    output_path = Path(job.output_file)
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Output file not found")
+
+    # Schedule cleanup after download
+    if background_tasks:
+        background_tasks.add_task(cleanup_job_directory, job_id)
+
+    return FileResponse(
+        output_path,
+        filename=f"splat_{job_id}.ply",
+        media_type="application/octet-stream"
+    )
+
+
+@app.post("/job/{job_id}/cancel")
+async def cancel_job(job_id: str):
+    """
+    Cancel a running conversion job.
+    """
+    if job_id not in active_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    cancelled_jobs.add(job_id)
+    return {"status": "cancelled", "job_id": job_id}
+
+
+@app.get("/job/{job_id}/status")
+async def get_job_status(job_id: str):
+    """
+    Get the current status of a job.
+    """
+    if job_id not in active_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return asdict(active_jobs[job_id])
+
+
 @app.post("/convert")
 async def convert_image(
     file: UploadFile = File(...),
@@ -337,6 +650,7 @@ async def convert_image(
     Accepts an image file, runs SHARP to convert it to a gaussian splat PLY.
     Quality parameter controls downsampling (5-100% of splats to keep).
     Returns the cleaned and optionally downsampled PLY file.
+    (Non-streaming version for backwards compatibility)
     """
     # Clamp quality to valid range
     quality = max(5, min(100, quality))

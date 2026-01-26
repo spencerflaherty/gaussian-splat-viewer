@@ -3,6 +3,7 @@ import { useHeadTracking } from './hooks/useHeadTracking';
 import { SplatViewer } from './components/viewer/SplatViewer';
 import { HUDOverlay } from './components/controls/HUD';
 import { DropZone } from './components/upload/DropZone';
+import { ConversionProgress } from './components/upload/ConversionProgress';
 import { useSettingsStore, useViewerStore } from './stores';
 
 const HAS_SEEN_SETTINGS_KEY = 'splat-viewer-has-seen-settings';
@@ -58,6 +59,9 @@ function App() {
   const processingRef = useRef(false);
   const hasCheckedSettingsRef = useRef(false);
   const [highlightSettings, setHighlightSettings] = useState(false);
+
+  // State for streaming conversion
+  const [convertingFile, setConvertingFile] = useState<File | null>(null);
 
   // Show settings panel on first use when entering head tracking mode
   useEffect(() => {
@@ -118,6 +122,7 @@ function App() {
   const handleExit = useCallback(() => {
     reset();
     setShowSettings(false);
+    setConvertingFile(null);
     processingRef.current = false;
   }, [reset, setShowSettings]);
 
@@ -132,7 +137,7 @@ function App() {
 
   // File processing
   const processFile = async (file: File) => {
-    if (processingRef.current || processingStage !== 'idle') return;
+    if (processingRef.current || processingStage !== 'idle' || convertingFile) return;
     processingRef.current = true;
 
     setError(null);
@@ -150,32 +155,31 @@ function App() {
         return;
       }
 
-      setProcessingStage('uploading');
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('quality', '100');
-
-        setProcessingStage('converting');
-        const response = await fetch(`${BACKEND_URL}/convert`, { method: 'POST', body: formData });
-
-        if (!response.ok) throw new Error(await response.text() || 'Conversion failed');
-
-        setProcessingStage('loading');
-        const blob = await response.blob();
-        if (blob.size < 1000) throw new Error('Invalid response');
-
-        setSplat(URL.createObjectURL(blob), 'ply', file.name);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Conversion failed');
-        setProcessingStage('idle');
-        processingRef.current = false;
-      }
+      // Use streaming conversion with ConversionProgress component
+      setConvertingFile(file);
     } else {
       setError('Unsupported file type');
       processingRef.current = false;
     }
   };
+
+  // Conversion callbacks
+  const handleConversionComplete = useCallback((blob: Blob, _jobId: string) => {
+    setConvertingFile(null);
+    setProcessingStage('loading');
+    setSplat(URL.createObjectURL(blob), 'ply', convertingFile?.name || 'converted.ply');
+  }, [convertingFile, setProcessingStage, setSplat]);
+
+  const handleConversionError = useCallback((errorMsg: string) => {
+    setConvertingFile(null);
+    setError(errorMsg);
+    processingRef.current = false;
+  }, [setError]);
+
+  const handleConversionCancel = useCallback(() => {
+    setConvertingFile(null);
+    processingRef.current = false;
+  }, []);
 
   // Drag-and-drop handlers
   const [isDragOver, setIsDragOver] = useState(false);
@@ -232,7 +236,16 @@ function App() {
     >
       <video ref={videoRef} autoPlay playsInline muted className="hidden" style={{ transform: 'scaleX(-1)' }} />
 
-      {!splatUrl ? (
+      {convertingFile ? (
+        <ConversionProgress
+          file={convertingFile}
+          quality={100}
+          backendUrl={BACKEND_URL}
+          onComplete={handleConversionComplete}
+          onError={handleConversionError}
+          onCancel={handleConversionCancel}
+        />
+      ) : !splatUrl ? (
         <DropZone
           isDragOver={isDragOver}
           isProcessing={isProcessing}
