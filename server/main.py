@@ -412,30 +412,51 @@ async def run_sharp_with_progress(
 
         async def read_stderr():
             nonlocal progress
+            buffer = ""
             while True:
-                line = await process.stderr.readline()
-                if not line:
-                    break
-                line_text = line.decode('utf-8', errors='ignore').strip()
-                stderr_output.append(line_text)
-                print(f"[SHARP] {line_text}")
+                try:
+                    # Use read() with chunk size instead of readline() to avoid
+                    # LimitOverrunError when SHARP outputs very long lines (>64KB)
+                    chunk = await process.stderr.read(8192)  # 8KB chunks
+                    if not chunk:
+                        break
 
-                # Check for cancellation
-                if job_id in cancelled_jobs:
-                    process.terminate()
-                    raise asyncio.CancelledError("Job cancelled by user")
+                    # Decode and add to buffer
+                    buffer += chunk.decode('utf-8', errors='ignore')
 
-                # Parse progress from SHARP output
-                # SHARP typically outputs progress like "Processing: 50%" or similar
-                progress_match = re.search(r'(\d+)%', line_text)
-                if progress_match:
-                    progress = int(progress_match.group(1))
-                elif 'loading' in line_text.lower():
-                    progress = 10
-                elif 'predicting' in line_text.lower() or 'processing' in line_text.lower():
-                    progress = min(progress + 5, 80)
-                elif 'saving' in line_text.lower():
-                    progress = 85
+                    # Process complete lines from buffer
+                    while '\n' in buffer:
+                        line_text, buffer = buffer.split('\n', 1)
+                        line_text = line_text.strip()
+                        if line_text:
+                            stderr_output.append(line_text)
+                            # Only print first 200 chars to avoid log spam
+                            print(f"[SHARP] {line_text[:200]}{'...' if len(line_text) > 200 else ''}")
+
+                            # Parse progress from SHARP output
+                            progress_match = re.search(r'(\d+)%', line_text)
+                            if progress_match:
+                                progress = int(progress_match.group(1))
+                            elif 'loading' in line_text.lower():
+                                progress = 10
+                            elif 'predicting' in line_text.lower() or 'processing' in line_text.lower():
+                                progress = min(progress + 5, 80)
+                            elif 'saving' in line_text.lower():
+                                progress = 85
+
+                    # Check for cancellation
+                    if job_id in cancelled_jobs:
+                        process.terminate()
+                        raise asyncio.CancelledError("Job cancelled by user")
+
+                except asyncio.LimitOverrunError:
+                    # If we still hit the limit, drain the buffer and continue
+                    print("[SHARP] Warning: Large output chunk, draining buffer")
+                    try:
+                        await process.stderr.read(65536)  # Drain up to 64KB
+                    except:
+                        pass
+                    continue
 
         # Start reading stderr in background
         stderr_task = asyncio.create_task(read_stderr())
