@@ -203,11 +203,8 @@ echo -e "${YELLOW}Note: The first image conversion will download the"
 echo -e "SHARP model (~2.6GB). This only happens once.${NC}"
 echo ""
 
-# Ask if user wants to start now
-read -p "Start the app now? [Y/n] " -n 1 -r
+# Start the app automatically after installation
+# (When run via curl | bash, we can't prompt for input)
 echo ""
-if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-    echo ""
-    echo "Starting Splat Viewer..."
-    splat-viewer
-fi
+echo "Starting Splat Viewer..."
+exec splat-viewer
