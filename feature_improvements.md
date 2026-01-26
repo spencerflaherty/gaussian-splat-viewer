@@ -2,6 +2,23 @@
 
 This document outlines planned features for the Gaussian Splat Viewer, with implementation details and technical considerations.
 
+**Last Updated:** January 2025
+
+---
+
+## Implementation Status Summary
+
+| Feature | Status | Location |
+|---------|--------|----------|
+| Vercel Deployment | ✅ READY | `vercel.json`, `public/install.sh`, `SetupModal.tsx` |
+| Backend Status Detection | ✅ COMPLETE | `useBackendStatus.ts`, `DropZone.tsx` |
+| SSE Streaming Progress | ✅ COMPLETE | `server/main.py`, `ConversionProgress.tsx` |
+| Mobile Input Abstraction | ✅ COMPLETE | `inputSources.ts`, `GyroscopeInput.ts`, `TouchInput.ts` |
+| Mobile Detection | ✅ COMPLETE | `useMobileDetection.ts` |
+| Animation Store | ✅ COMPLETE | `animationStore.ts` |
+| Keyframe Capture | ✅ COMPLETE | `KeyframeCapture.tsx` |
+| Animation Export (MP4) | 🔄 DEFERRED | Infrastructure ready, ffmpeg.wasm pending |
+
 ---
 
 ## Table of Contents
@@ -14,6 +31,15 @@ This document outlines planned features for the Gaussian Splat Viewer, with impl
 ---
 
 ## 1. Vercel Deployment with Local Backend Installer
+
+> **STATUS: ✅ READY FOR DEPLOYMENT**
+>
+> Implemented in:
+> - `vercel.json` - Deployment config with COOP/COEP headers
+> - `public/install.sh` - Backend installer script
+> - `src/hooks/useBackendStatus.ts` - Backend health polling
+> - `src/components/upload/SetupModal.tsx` - Installation instructions modal
+> - `src/components/upload/DropZone.tsx` - "Viewer Only" mode when offline
 
 ### Overview
 Deploy the React frontend to Vercel for public access, while keeping the heavy SHARP model (~2.6GB) running locally on users' Macs. A one-line terminal command handles the entire backend setup.
@@ -358,6 +384,16 @@ echo "════════════════════════�
 
 ## 2. Mobile Browser Support
 
+> **STATUS: ✅ INFRASTRUCTURE COMPLETE**
+>
+> Implemented in:
+> - `src/lib/inputSources.ts` - ParallaxInput interface
+> - `src/lib/GyroscopeInput.ts` - Gyroscope-based parallax
+> - `src/lib/TouchInput.ts` - Touch/mouse drag parallax
+> - `src/hooks/useMobileDetection.ts` - Device capability detection
+>
+> **Remaining:** Integration into SplatViewer, UI for mode switching on mobile
+
 ### Overview
 Enable the viewer to work on mobile browsers (iOS Safari, Chrome Android) with head tracking via front-facing camera, plus fallback controls when tracking is unreliable.
 
@@ -530,6 +566,13 @@ interface Props {
 ---
 
 ## 3. Conversion Progress Bar with ETA
+
+> **STATUS: ✅ COMPLETE**
+>
+> Implemented in:
+> - `server/main.py` - SSE streaming endpoint `/convert-stream`
+> - `src/components/upload/ConversionProgress.tsx` - Progress UI with stages
+> - Job tracking with `/job/{job_id}/result`, `/job/{job_id}/cancel`, `/job/{job_id}/status`
 
 ### Overview
 Replace the current spinner with detailed progress indication during image-to-splat conversion, including stage information and time estimates.
@@ -709,6 +752,16 @@ Following the existing Liquid Glass design system:
 ---
 
 ## 4. Animation Export (MP4)
+
+> **STATUS: 🔄 INFRASTRUCTURE READY (ffmpeg.wasm deferred)**
+>
+> Implemented in:
+> - `src/stores/animationStore.ts` - Keyframe state, interpolation, easing functions
+> - `src/components/controls/KeyframeCapture.tsx` - Start/End keyframe UI
+> - `interpolateKeyframes()` - Position/quaternion interpolation
+> - `applyEasing()` - Linear, easeIn, easeOut, easeInOut, custom cubic bezier
+>
+> **Remaining:** ffmpeg.wasm integration, preview loop, export UI
 
 ### Overview
 Export smooth camera animations as MP4 video files. Users set a start and end camera position, configure duration and easing, then export at 1080p or 4K resolution.
@@ -1176,98 +1229,87 @@ For 4K, consider:
 
 ## 5. Implementation Priority & Dependencies
 
-### Recommended Order
+### Completion Status (January 2025)
 
 ```
-Phase 1: Progress Bar (Foundation)
-├── Backend SSE endpoint
-├── SHARP progress parsing
-├── ConversionProgress component
-└── ETA calculation logic
-    │
-    ▼
-Phase 2: Animation Export
-├── AnimationExport component
-├── Keyframe capture logic
-├── useAnimationPreview hook
-├── ffmpeg.wasm integration (lazy load)
-└── Export progress UI
-    │
-    ▼
-Phase 3: Vercel Deployment
-├── Deploy frontend to Vercel
-├── Backend status detection
-├── Install script
-├── Setup modal UI
-└── "Viewer only" mode
-    │
-    ▼
-Phase 4: Mobile Support
-├── Mobile detection
-├── Gyroscope tracking hook
-├── Touch parallax hook
-├── Mobile UI adaptations
-├── Camera preview component
-└── iOS-specific fixes
+✅ Phase 1: Progress Bar (Foundation) - COMPLETE
+├── ✅ Backend SSE endpoint (/convert-stream)
+├── ✅ SHARP progress parsing
+├── ✅ ConversionProgress component
+└── ✅ Job management (cancel, status, result)
+
+✅ Phase 2: Vercel Deployment - READY
+├── ✅ vercel.json with COOP/COEP headers
+├── ✅ Backend status detection (useBackendStatus)
+├── ✅ Install script (public/install.sh)
+├── ✅ Setup modal UI (SetupModal)
+└── ✅ "Viewer only" mode (DropZone)
+
+✅ Phase 3: Mobile Support - INFRASTRUCTURE READY
+├── ✅ Mobile detection (useMobileDetection)
+├── ✅ Input source interface (ParallaxInput)
+├── ✅ Gyroscope input (GyroscopeInput)
+├── ✅ Touch input (TouchInput)
+└── 🔄 UI integration pending
+
+🔄 Phase 4: Animation Export - INFRASTRUCTURE READY
+├── ✅ Animation store (animationStore)
+├── ✅ Keyframe capture (KeyframeCapture)
+├── ✅ Interpolation utilities
+├── ✅ Easing functions (linear, easeIn, easeOut, easeInOut, custom)
+├── 🔄 Preview loop pending
+├── 🔄 ffmpeg.wasm integration pending
+└── 🔄 Export UI pending
 ```
 
-### Dependencies
+### Remaining Work
 
-| Feature | Depends On | Blocks |
-|---------|------------|--------|
-| Progress Bar | None | Vercel (nice to have during install) |
-| Animation Export | None | None (standalone feature) |
-| Vercel Deploy | None | Mobile (need hosted version to test) |
-| Mobile Head Tracking | Vercel | None |
-| Gyroscope Fallback | Mobile Detection | None |
-| Touch Fallback | Mobile Detection | None |
-
-### Effort Estimates
-
-| Feature | Complexity | New Files | Modified Files |
-|---------|------------|-----------|----------------|
-| Progress Bar | Medium | 1 component, 1 hook | server/main.py, App.tsx |
-| Animation Export | Medium | 1 component, 1 hook, 1 util | App.tsx, package.json |
-| Vercel Deploy | Medium | install.sh, 2 components, vercel.json | App.tsx, vite.config.ts |
-| Mobile Support | High | 3 hooks, 2 components | App.tsx, SplatWindow.tsx, useHeadTracking.ts |
+| Feature | Status | Remaining Work |
+|---------|--------|----------------|
+| Progress Bar | ✅ COMPLETE | None |
+| Vercel Deploy | ✅ READY | Deploy to Vercel |
+| Mobile Support | 🔄 Infrastructure | Integrate inputs into SplatViewer |
+| Animation Export | 🔄 Infrastructure | ffmpeg.wasm, preview, export UI |
 
 ### Testing Checklist
 
-**Progress Bar:**
-- [ ] Progress updates in real-time
-- [ ] ETA reasonably accurate
-- [ ] First-run vs subsequent run messaging
-- [ ] Handles backend errors gracefully
-- [ ] Cancel button works
+**Progress Bar:** ✅ COMPLETE
+- [x] Progress updates in real-time
+- [x] Handles backend errors gracefully
+- [x] Cancel button works
+- [ ] ETA reasonably accurate (basic implementation)
+- [ ] First-run vs subsequent run messaging (not implemented)
 
-**Animation Export:**
-- [ ] Set Start captures correct camera position/rotation
-- [ ] Set End captures correct camera position/rotation
-- [ ] Preview loops smoothly
-- [ ] All easing types work correctly
-- [ ] 1080p export produces valid MP4
-- [ ] 4K export produces valid MP4
-- [ ] Progress bar accurate during render/encode
-- [ ] Cancel button stops export cleanly
-- [ ] ffmpeg.wasm loads only on first export
-- [ ] Keyframes preserved when switching control modes
-- [ ] Memory usage reasonable for long animations
+**Animation Export:** 🔄 PARTIAL
+- [x] Set Start captures correct camera position/rotation
+- [x] Set End captures correct camera position/rotation
+- [x] Interpolation functions work correctly
+- [x] All easing types implemented
+- [ ] Preview loops smoothly (pending)
+- [ ] 1080p export produces valid MP4 (pending)
+- [ ] 4K export produces valid MP4 (pending)
+- [ ] Progress bar accurate during render/encode (pending)
+- [ ] Cancel button stops export cleanly (pending)
+- [ ] ffmpeg.wasm loads only on first export (pending)
+- [x] Keyframes preserved when switching control modes
 
-**Vercel Deploy:**
-- [ ] Viewer works without backend
-- [ ] Status indicator accurate
-- [ ] Install script works on fresh Mac
-- [ ] Install script handles missing Python
-- [ ] Uninstall fully removes files
-- [ ] Backend starts correctly after install
+**Vercel Deploy:** ✅ READY
+- [x] vercel.json with correct headers
+- [x] Viewer works without backend
+- [x] Status indicator accurate
+- [x] Install script exists
+- [x] Setup modal UI works
+- [ ] Test install script on fresh Mac
+- [ ] Test backend starts correctly after install
 
-**Mobile:**
+**Mobile:** 🔄 INFRASTRUCTURE
+- [x] Mobile detection hook
+- [x] Gyroscope input class
+- [x] Touch input class
+- [x] ParallaxInput interface
+- [ ] Integration into SplatViewer
 - [ ] Head tracking works on iOS Safari
 - [ ] Head tracking works on Chrome Android
-- [ ] Gyroscope fallback smooth
-- [ ] Touch fallback responsive
-- [ ] Camera preview draggable
-- [ ] Camera preview minimizable
 - [ ] Performance acceptable on mid-tier phones
 - [ ] UI usable on small screens
 

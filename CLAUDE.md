@@ -145,37 +145,34 @@ User drops file
 ### Key Dependencies
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `@mkkellogg/gaussian-splats-3d` | 0.4.7 | Gaussian splat rendering |
+| `@sparkjsdev/spark` | 0.1.10 | Gaussian splat rendering (migrated from gaussian-splats-3d) |
 | `@mediapipe/tasks-vision` | 0.10.32 | Face landmark detection |
 | `three` | 0.182.0 | 3D graphics foundation |
 | `react` | 19.2.0 | UI framework |
+| `zustand` | 5.0.5 | State management |
 | `concurrently` | 9.2.1 | Run frontend + backend together |
 
 ---
 
 ## Core Components
 
-### App.tsx (~1000 lines)
-Main application component that orchestrates the entire application.
+### App.tsx (~290 lines)
+Main application component that orchestrates the application. Significantly refactored from ~1000 lines.
 
 **Responsibilities:**
-- Drag-and-drop file handling for `.splat`, `.ply`, and image files
-- Backend communication for image-to-splat conversion
-- Head tracking parameter configuration with localStorage persistence
-- Auto-hiding controls overlay (shows on mouse movement, hides after 3 seconds)
-- Quality presets for SHARP conversion (Fast 5%, Balanced 15%, High 40%, Ultra 100%)
+- Drag-and-drop file handling via `DropZone` component
+- SSE streaming conversion via `ConversionProgress` component
+- Control mode switching (head tracking / orbit)
+- Auto-hiding HUD overlay
 
-**Key State:**
-| State | Type | Purpose |
-|-------|------|---------|
-| `splatUrl` | `string \| null` | Current splat blob URL |
-| `splatFormat` | `'ply' \| 'splat' \| null` | Format of loaded splat |
-| `controlMode` | `'head' \| 'orbit'` | Camera control mode |
-| `processingStage` | `ProcessingStage` | Upload/conversion stage |
-| `headTrackingParams` | `HeadTrackingParams` | Sensitivity, distance, etc. |
+**State Management:**
+All state is now managed via Zustand stores:
+- `useSettingsStore` - Head tracking parameters with presets
+- `useViewerStore` - Viewer state (splatUrl, format, controlMode, processingStage)
+- `useAnimationStore` - Animation keyframes and export settings
 
-### SplatWindow.tsx (~530 lines)
-3D viewer component using `@mkkellogg/gaussian-splats-3d`.
+### SplatViewer.tsx (~560 lines)
+3D viewer component using `@sparkjsdev/spark` (migrated from gaussian-splats-3d).
 
 **Responsibilities:**
 - Render Gaussian splat scenes with Three.js
@@ -429,9 +426,21 @@ pip install -e ml-sharp/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/` | GET | Health check - returns `{"status": "ok"}` |
-| `/convert` | POST | Convert image to PLY splat file |
+| `/convert` | POST | Convert image to PLY (blocking, for backwards compatibility) |
+| `/convert-stream` | POST | Convert image with SSE progress streaming |
+| `/job/{job_id}/result` | GET | Download completed conversion result |
+| `/job/{job_id}/status` | GET | Get job status |
+| `/job/{job_id}/cancel` | POST | Cancel a running job |
 
-**POST /convert:**
+**POST /convert-stream (Recommended):**
+- Request: `multipart/form-data` with `file` (image) and `quality` (5-100)
+- Response: SSE stream with progress events:
+  - `event: progress` - Stage and progress updates
+  - `event: complete` - Job finished with `job_id` to fetch result
+  - `event: error` - Conversion failed
+- Final result fetched via `/job/{job_id}/result`
+
+**POST /convert (Legacy):**
 - Request: `multipart/form-data` with `file` (image) and `quality` (5-100)
 - Response: Binary PLY file (`application/octet-stream`)
 - Quality is clamped to [5, 100] range
@@ -532,10 +541,12 @@ server: {
 
 | Bug | Description | Priority |
 |-----|-------------|----------|
-| Backend error validation | HTML error pages displayed as-is | MEDIUM |
-| Stale closure in updateCamera | `params` captured in closure | MEDIUM |
-| No camera state validation | No check before `.invert()` | MEDIUM |
-| Bounding box fails silently | Empty geometry returns (0,0,0) | MEDIUM |
+| Backend error validation | HTML error pages displayed as-is | LOW |
+| Bounding box fails silently | Empty geometry returns (0,0,0) | LOW |
+
+**Fixed in January 2025 Refactor:**
+- Stale closure in updateCamera - Now uses `paramsRef.current` in RAF callback
+- Camera state validation - Added proper checks before operations
 
 ---
 
@@ -600,15 +611,25 @@ self.crossOriginIsolated
 
 ## Future Features / Roadmap
 
+### Implemented (January 2025)
+- **SSE Streaming Progress**: Real-time conversion progress with cancel support ✅
+- **Vercel Deployment Ready**: vercel.json config, COOP/COEP headers, install.sh ✅
+- **Mobile Input Sources**: Gyroscope and touch drag input abstraction ✅
+- **Animation Infrastructure**: Keyframe capture, interpolation, easing functions ✅
+- **State Management**: Zustand stores for settings, viewer, and animation ✅
+- **Calibration Wizard**: Visual feedback during head tracking calibration ✅
+- **Settings Presets**: Subtle, Natural, Dramatic one-click presets ✅
+
 ### Planned Features
+- **Animation Export (MP4)**: ffmpeg.wasm integration for video export
+- **Preview Loop**: Animation preview playback in viewer
+- **Cubic Bezier Editor**: Visual easing curve editor
 - **Video Support**: Upload video -> extract frames -> generate 3D splat
 - **Multi-View**: Construct splats from multiple images or video frames
-- **Cloud Backend**: Option to use GPU cloud backend for generation
-- **Server Status UI**: Progress indicators for server initialization
 
-### Deployment Goals
-- Host viewer on Vercel for public access
-- Keep generation local (or dedicated GPU backend) due to ~2.6GB model size
+### Deferred
+- **CSS Class Consolidation**: 101 inline styles work well, low ROI to migrate
+- **Adaptive Quality**: Frame rate monitoring with auto quality adjustment
 
 ---
 
@@ -642,31 +663,60 @@ npm run test
 ```
 /
 ├── src/
-│   ├── main.tsx              # React entry point
-│   ├── App.tsx               # Main application (~1000 lines)
-│   ├── index.css             # Glassmorphism design system
+│   ├── main.tsx                    # React entry point
+│   ├── App.tsx                     # Main application (~290 lines, refactored)
+│   ├── index.css                   # Glassmorphism design system
 │   ├── components/
-│   │   ├── SplatWindow.tsx   # 3D viewer (~530 lines)
-│   │   └── ErrorBoundary.tsx # Error handling (57 lines)
-│   └── hooks/
-│       └── useHeadTracking.ts # Face tracking (~130 lines)
+│   │   ├── ErrorBoundary.tsx       # Error handling
+│   │   ├── ui/
+│   │   │   ├── LiquidGlass.tsx     # iOS 26 glass panel component
+│   │   │   └── Slider.tsx          # Parameter slider with text input
+│   │   ├── viewer/
+│   │   │   ├── SplatViewer.tsx     # 3D viewer (~560 lines)
+│   │   │   ├── LoadingOverlay.tsx  # Loading spinner
+│   │   │   └── ErrorOverlay.tsx    # Error display
+│   │   ├── controls/
+│   │   │   ├── HUD.tsx             # Heads-up display overlay
+│   │   │   ├── ModeSwitcher.tsx    # Head/Orbit mode toggle
+│   │   │   ├── SettingsPanel.tsx   # Parameter controls
+│   │   │   ├── CalibrationWizard.tsx # Head tracking calibration
+│   │   │   └── KeyframeCapture.tsx # Animation keyframe UI
+│   │   └── upload/
+│   │       ├── DropZone.tsx        # File drag-and-drop
+│   │       ├── ConversionProgress.tsx # SSE progress display
+│   │       └── SetupModal.tsx      # Backend installation instructions
+│   ├── hooks/
+│   │   ├── useHeadTracking.ts      # Face tracking with MediaPipe
+│   │   ├── useBackendStatus.ts     # Backend health polling
+│   │   └── useMobileDetection.ts   # Device capability detection
+│   ├── stores/
+│   │   ├── index.ts                # Store exports
+│   │   ├── settingsStore.ts        # Head tracking params + presets
+│   │   ├── viewerStore.ts          # Viewer state
+│   │   └── animationStore.ts       # Animation keyframes + easing
+│   └── lib/
+│       ├── splatRenderer.ts        # Spark adapter
+│       ├── inputSources.ts         # ParallaxInput interface
+│       ├── GyroscopeInput.ts       # Gyroscope-based parallax
+│       └── TouchInput.ts           # Touch/mouse drag parallax
 ├── server/
-│   ├── main.py               # FastAPI backend (~320 lines)
-│   └── requirements.txt      # Python dependencies
+│   ├── main.py                     # FastAPI backend (~750 lines)
+│   └── requirements.txt            # Python dependencies
 ├── e2e/
-│   └── viewer.spec.ts        # Playwright tests
+│   └── viewer.spec.ts              # Playwright tests
 ├── public/
-│   ├── vite.svg              # Vite logo
-│   └── samples/              # Test files
-│       ├── sample_train.splat
-│       ├── test.ply
-│       └── ...
-├── ml-sharp/                  # Apple SHARP submodule
-├── temp_uploads/              # Uploaded images (gitignored)
-├── temp_outputs/              # Converted PLYs (gitignored)
-├── start.sh                   # Shell launcher script
-├── package.json               # NPM config with scripts
-├── vite.config.ts             # Vite configuration
-├── tsconfig.json              # TypeScript configuration
-└── CLAUDE.md                  # This file
+│   ├── install.sh                  # Backend installer script
+│   └── samples/                    # Test files
+├── ml-sharp/                       # Apple SHARP submodule
+├── temp_uploads/                   # Uploaded images (gitignored)
+├── temp_outputs/                   # Converted PLYs (gitignored)
+├── vercel.json                     # Vercel deployment config
+├── start.sh                        # Shell launcher script
+├── package.json                    # NPM config with scripts
+├── vite.config.ts                  # Vite configuration
+├── tsconfig.json                   # TypeScript configuration
+├── CLAUDE.md                       # This file
+├── PRD.md                          # Product Requirements Document
+├── EXECUTION_PLAN.md               # Refactor execution plan
+└── feature_improvements.md         # Feature roadmap
 ```
