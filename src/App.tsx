@@ -264,6 +264,7 @@ function App() {
             controlMode={controlMode}
             headTrackingParams={params}
             rendererSettings={rendererSettings}
+            isCalibrated={isCalibrated}
             onLoaded={handleSplatLoaded}
             onError={handleSplatError}
             onCenterViewReady={(fn) => { centerViewRef.current = fn; }}

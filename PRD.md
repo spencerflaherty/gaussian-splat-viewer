@@ -1,7 +1,7 @@
 # Product Requirements Document
 ## Splat Window: Gaussian Splat Viewer with Head Tracking
 
-**Version:** 2.3 (Simplified Settings & Camera Controls)
+**Version:** 2.4 (Camera Transfer & Calibration Flow)
 **Author:** Critical Architecture Review
 **Date:** January 2025
 **Status:** Implementation Complete (Core Features)
@@ -824,6 +824,7 @@ interface AnimationConfig {
 | 2.1 | Jan 2025 | Claude | Updated status for all sections, consolidated with CLAUDE.md |
 | 2.2 | Jan 2025 | Claude | Added slider info tooltips, editable camera controls, PLY camera fix, zoom effect fix |
 | 2.3 | Jan 2025 | Claude | Simplified settings: removed presets and offset sliders, added up/down ticker buttons to camera inputs |
+| 2.4 | Jan 2025 | Claude | Camera transfer: orbit position becomes head tracking baseline after calibration; fixed defaults (deadZone=0, invertX UI logic) |
 
 ---
 

@@ -65,7 +65,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'splat-viewer-settings',
-      version: 3, // Bump version for updated defaults (Jan 2025)
+      version: 4, // Bump version for updated defaults (deadZone=0, invertX=true)
     }
   )
 );

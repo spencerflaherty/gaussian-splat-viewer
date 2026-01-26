@@ -45,7 +45,7 @@ const SLIDER_CONFIG: Record<string, {
     min: 0, max: 0.01, step: 0.001,
     label: 'Dead Zone',
     minLabel: 'None', maxLabel: 'Large',
-    defaultValue: 0.005,
+    defaultValue: 0,
     description: 'Ignores tiny movements below this threshold. Helps reduce jitter from tracking noise.',
   },
 };
@@ -278,7 +278,9 @@ export function SettingsPanel({
                   <div style={{ display: 'flex', gap: 8 }}>
                     {(['invertX', 'invertY', 'invertZ'] as const).map((axis) => {
                       const labels = { invertX: 'Flip X', invertY: 'Flip Y', invertZ: 'Flip Z' };
-                      const isInverted = params[axis];
+                      const rawValue = params[axis];
+                      // For X axis, invert the display logic (true=natural state shown as off)
+                      const showAsActive = axis === 'invertX' ? !rawValue : rawValue;
                       return (
                         <button
                           key={axis}
@@ -288,15 +290,15 @@ export function SettingsPanel({
                             padding: '8px 6px',
                             borderRadius: 8,
                             border: 'none',
-                            background: isInverted ? 'rgba(255, 149, 0, 0.9)' : 'rgba(0, 0, 0, 0.04)',
-                            color: isInverted ? 'white' : 'rgba(0, 0, 0, 0.4)',
+                            background: showAsActive ? 'rgba(255, 149, 0, 0.9)' : 'rgba(0, 0, 0, 0.04)',
+                            color: showAsActive ? 'white' : 'rgba(0, 0, 0, 0.4)',
                             cursor: 'pointer',
                             transition: 'all 0.2s ease',
                             fontSize: 12,
                             fontWeight: 600,
                           }}
                         >
-                          {isInverted ? '↔ ' : ''}{labels[axis]}
+                          {showAsActive ? '↔ ' : ''}{labels[axis]}
                         </button>
                       );
                     })}

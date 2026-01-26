@@ -262,10 +262,21 @@ The HUD includes a **Camera Position Control Box** in the top-right corner that 
 
 **Features:**
 - **Editable inputs**: Click to edit values directly without live updates overwriting your input
-- **Arrow key support**: Use Up/Down arrows to increment/decrement values by 0.1
+- **Up/Down ticker buttons**: Click arrows to increment/decrement by step (0.1 for position, 1.0 for Look At)
+- **Arrow key support**: Use Up/Down arrows to increment/decrement values
 - **Enter to apply**: Press Enter to apply changes immediately
 - **Escape to cancel**: Press Escape to revert to current value
 - Auto-hides with the rest of the HUD controls after 3 seconds of inactivity
+
+**Default Camera Position (PLY files):**
+- Position: `(0, 0, -0.80)`
+- Look At: `(0, 0, -40)`
+
+**Camera Transfer (Orbit → Head Tracking):**
+When switching from orbit mode to head tracking mode, the camera position set in orbit mode becomes the "home" baseline for head tracking after calibration completes. This allows users to:
+1. Load a splat and adjust the view in orbit mode
+2. Switch to head tracking mode
+3. After calibration (~0.5s), head movements are applied as offsets from the orbit camera position
 
 The `EditableNumberInput` component maintains local state while focused, preventing the live camera position updates from overwriting user input mid-edit.
 
@@ -339,7 +350,7 @@ Camera offsets are kept internally but removed from the Settings panel. Use the 
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
 | `smoothing` | **0.15** | 0.05 - 0.25 | Smoothing factor (lower = more responsive). Default at 50% |
-| `deadZone` | **0.005** | 0 - 0.01 | Ignore small movements. Default at 50% |
+| `deadZone` | **0** | 0 - 0.01 | Ignore small movements. Default is 0 (off) |
 
 #### Legacy Parameters (kept for compatibility)
 | Parameter | Default | Description |
@@ -355,7 +366,7 @@ Camera offsets are kept internally but removed from the Settings panel. Use the 
 | `enableX` | true | Enable/disable X-axis (left/right) tracking |
 | `enableY` | true | Enable/disable Y-axis (up/down) tracking |
 | `enableZ` | true | Enable/disable Z-axis (depth) tracking |
-| `invertX` | false | Flip X-axis direction |
+| `invertX` | **true** | X-axis inverted (but UI shows as "off" - this is the natural state) |
 | `invertY` | false | Flip Y-axis direction |
 | `invertZ` | false | Flip Z-axis direction |
 
@@ -363,7 +374,7 @@ The UI provides toggle buttons for each axis:
 - **Enable buttons** (blue when active): Turn tracking on/off for each axis
 - **Flip buttons** (orange when active): Invert the direction of each axis
 
-**Note:** All axes are un-flipped by default (calibrated January 2025).
+**Note:** The X-axis is inverted by default in the code (`invertX: true`), but the UI button shows as "off" (grey) because this is the calibrated natural behavior. Clicking "Flip X" actually disables the inversion.
 
 ### Sensitivity Explained
 

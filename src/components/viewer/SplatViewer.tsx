@@ -80,6 +80,8 @@ interface SplatViewerProps {
     headTrackingParams?: HeadTrackingParams;
     /** Spark renderer settings (focalAdjustment, maxStdDev, etc.) */
     rendererSettings?: RendererSettings;
+    /** Whether head tracking calibration is complete */
+    isCalibrated?: boolean;
     onError?: (error: string) => void;
     onLoaded?: () => void;
     /** Callback to get the centerView function */
@@ -116,7 +118,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
 
     // Smoothing
     smoothing: 0.15,         // Lower = smoother but more latency
-    deadZone: 0.005,         // Ignore small jitter
+    deadZone: 0,             // No dead zone by default
 
     // Axis toggles - all enabled by default
     enableX: true,           // Left/right tracking
@@ -124,12 +126,12 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     enableZ: true,           // Depth/zoom tracking
 
     // Axis inversion - calibrated for natural movement
-    invertX: false,          // No X flip needed (calibrated Jan 2025)
+    invertX: true,           // X axis inverted (but UI shows as "off" - this is the natural state)
     invertY: false,          // Move head up -> camera moves up -> see bottom
     invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };
 
-export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, rendererSettings, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate, onSetCameraPositionReady }: SplatViewerProps) {
+export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, rendererSettings, isCalibrated, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate, onSetCameraPositionReady }: SplatViewerProps) {
     const params = headTrackingParams ?? DEFAULT_HEAD_TRACKING_PARAMS;
     // Track renderer settings in ref for dynamic updates
     const rendererSettingsRef = useRef(rendererSettings);
@@ -321,19 +323,10 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                                 size: size.toArray()
                             });
 
-                            // Camera position: at origin (matching original camera perspective)
-                            // Tested values: Camera (0.01, 0.02, -0.04), Look At (0.78, 0.00, -40.06)
-                            const camPos = new THREE.Vector3(0, 0, 0);
-
-                            // Look at: into the scene along negative Z
-                            // Use center X for horizontal centering, Y=0 for vertical,
-                            // and somewhere in the middle of the Z range for depth
-                            const targetX = center.x;
-                            const targetY = 0; // Keep vertical at 0 for natural view
-                            // Look at roughly the middle depth of the scene (negative Z)
-                            const targetZ = (box.min.z + box.max.z) / 2;
-
-                            const lookAt = new THREE.Vector3(targetX, targetY, targetZ);
+                            // Camera defaults (calibrated Jan 2025)
+                            // Position: slightly behind origin, Look At: into the scene
+                            const camPos = new THREE.Vector3(0, 0, -0.80);
+                            const lookAt = new THREE.Vector3(0, 0, -40);
 
                             camera.position.copy(camPos);
                             camera.lookAt(lookAt);
@@ -526,8 +519,32 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         }
     }, [controlMode, loading]);
 
-    // Store base camera position from orbit mode (set when switching to head tracking)
+    // Store base camera position from orbit mode (set when calibration completes)
     const baseCameraRef = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+    // Track previous calibration state to detect when calibration completes
+    const wasCalibrated = useRef(false);
+
+    // Set head tracking base when calibration completes (using orbit camera position)
+    useEffect(() => {
+        if (controlMode === 'head' && isCalibrated && !wasCalibrated.current) {
+            // Calibration just completed - use orbit camera position as base
+            if (lastOrbitCameraRef.current) {
+                baseCameraRef.current = {
+                    position: lastOrbitCameraRef.current.position.clone(),
+                    target: lastOrbitCameraRef.current.target.clone(),
+                };
+                if (import.meta.env.DEV) console.log('[SplatWindow] Calibration complete - using orbit position as head tracking base:', baseCameraRef.current.position.toArray());
+            }
+        }
+        wasCalibrated.current = isCalibrated ?? false;
+    }, [isCalibrated, controlMode]);
+
+    // Reset base when switching back to orbit mode
+    useEffect(() => {
+        if (controlMode === 'orbit') {
+            baseCameraRef.current = null;
+        }
+    }, [controlMode]);
 
     // Head tracking camera updates with actual camera translation
     useEffect(() => {
@@ -539,19 +556,8 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
 
         if (!viewerRef.current || loading) return;
 
-        // Only run in head tracking mode
-        if (controlMode !== 'head') return;
-
-        const viewer = viewerRef.current;
-
-        // Capture the current camera position as the "home" base for head tracking
-        if (!baseCameraRef.current && viewer.camera) {
-            baseCameraRef.current = {
-                position: viewer.camera.position.clone(),
-                target: viewer.controls?.target?.clone() || new THREE.Vector3(0, 0, 0),
-            };
-            if (import.meta.env.DEV) console.log('[SplatWindow] Set head tracking base:', baseCameraRef.current.position.toArray());
-        }
+        // Only run in head tracking mode when calibrated
+        if (controlMode !== 'head' || !isCalibrated) return;
 
         if (import.meta.env.DEV) console.log('[SplatWindow] Starting head tracking camera loop');
 
@@ -663,7 +669,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
             if (import.meta.env.DEV) console.log('[SplatWindow] Stopped head tracking camera loop');
         };
     // Note: params removed from deps - we use paramsRef.current inside RAF for immediate updates
-    }, [controlMode, loading, headPosition]);
+    }, [controlMode, loading, headPosition, isCalibrated]);
 
     // Update renderer settings when they change
     useEffect(() => {
