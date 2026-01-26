@@ -86,6 +86,8 @@ interface SplatViewerProps {
     onCenterViewReady?: (centerView: () => void) => void;
     /** Callback for real-time camera position updates (for debugging) */
     onCameraPositionUpdate?: (position: CameraPositionData) => void;
+    /** Callback to get the setCameraPosition function for manual control */
+    onSetCameraPositionReady?: (setCameraPosition: (pos: CameraPositionData) => void) => void;
 }
 
 /**
@@ -127,7 +129,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };
 
-export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, rendererSettings, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate }: SplatViewerProps) {
+export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, rendererSettings, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate, onSetCameraPositionReady }: SplatViewerProps) {
     const params = headTrackingParams ?? DEFAULT_HEAD_TRACKING_PARAMS;
     // Track renderer settings in ref for dynamic updates
     const rendererSettingsRef = useRef(rendererSettings);
@@ -406,6 +408,37 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                                     target: homeCameraRef.current.target.clone(),
                                 };
                                 if (import.meta.env.DEV) console.log('[SplatWindow] Centered view');
+                            });
+                        }
+
+                        // Provide setCameraPosition function to parent for manual camera control
+                        if (onSetCameraPositionReady) {
+                            onSetCameraPositionReady((pos: CameraPositionData) => {
+                                if (!viewer.camera) return;
+
+                                const newPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+                                const newTarget = new THREE.Vector3(pos.targetX, pos.targetY, pos.targetZ);
+
+                                viewer.camera.position.copy(newPos);
+                                viewer.camera.lookAt(newTarget);
+                                viewer.camera.updateMatrixWorld(true);
+
+                                if (viewer.controls?.target) {
+                                    viewer.controls.target.copy(newTarget);
+                                    viewer.controls.update();
+                                }
+
+                                // Update stored positions
+                                homeCameraRef.current = {
+                                    position: newPos.clone(),
+                                    target: newTarget.clone(),
+                                };
+                                lastOrbitCameraRef.current = {
+                                    position: newPos.clone(),
+                                    target: newTarget.clone(),
+                                };
+
+                                if (import.meta.env.DEV) console.log('[SplatWindow] Manual camera position set:', pos);
                             });
                         }
                     }, 200);

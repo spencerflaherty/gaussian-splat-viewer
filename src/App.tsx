@@ -73,6 +73,9 @@ function App() {
   // Center view function from SplatViewer
   const centerViewRef = useRef<(() => void) | null>(null);
 
+  // Set camera position function from SplatViewer
+  const setCameraPositionRef = useRef<((pos: CameraPositionData) => void) | null>(null);
+
   // Camera position for debugging
   const [cameraPosition, setCameraPosition] = useState<CameraPositionData | null>(null);
 
@@ -265,6 +268,7 @@ function App() {
             onError={handleSplatError}
             onCenterViewReady={(fn) => { centerViewRef.current = fn; }}
             onCameraPositionUpdate={setCameraPosition}
+            onSetCameraPositionReady={(fn) => { setCameraPositionRef.current = fn; }}
           />
         </div>
       )}
@@ -287,6 +291,7 @@ function App() {
           highlightSettings={highlightSettings}
           onCenterView={() => centerViewRef.current?.()}
           cameraPosition={cameraPosition}
+          onSetCameraPosition={(pos) => setCameraPositionRef.current?.(pos)}
         />
       )}
 

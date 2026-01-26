@@ -24,8 +24,9 @@ export interface HUDOverlayProps {
   highlightSettings?: boolean;
   // Center view callback
   onCenterView?: () => void;
-  // Camera position for debugging
+  // Camera position for debugging and manual control
   cameraPosition?: CameraPositionData | null;
+  onSetCameraPosition?: (position: CameraPositionData) => void;
 }
 
 /**
@@ -53,6 +54,7 @@ export function HUDOverlay({
   highlightSettings = false,
   onCenterView,
   cameraPosition,
+  onSetCameraPosition,
 }: HUDOverlayProps) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 999999, pointerEvents: 'none' }}>
@@ -64,7 +66,7 @@ export function HUDOverlay({
         visible={showControls}
       />
 
-      {/* Camera Position Debug Box (top-right) */}
+      {/* Camera Position Control Box (top-right) */}
       {cameraPosition && (
         <div style={{
           position: 'absolute',
@@ -74,30 +76,107 @@ export function HUDOverlay({
           transition: 'opacity 0.3s ease',
           pointerEvents: showControls ? 'auto' : 'none',
         }}>
-          <LiquidGlass variant="sidebar" style={{ padding: 12, minWidth: 180 }}>
+          <LiquidGlass variant="sidebar" style={{ padding: 12, minWidth: 200 }}>
             <div style={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 8 }}>
               Camera Position
             </div>
-            <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 12, lineHeight: 1.6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'rgba(0, 0, 0, 0.5)' }}>X:</span>
-                <span style={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>{cameraPosition.x.toFixed(3)}</span>
+            <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 12 }}>
+              {/* Camera X */}
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>X:</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={cameraPosition.x.toFixed(2)}
+                  onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, x: parseFloat(e.target.value) || 0 })}
+                  style={{
+                    flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+                    border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
+                    width: 80,
+                  }}
+                />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'rgba(0, 0, 0, 0.5)' }}>Y:</span>
-                <span style={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>{cameraPosition.y.toFixed(3)}</span>
+              {/* Camera Y */}
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Y:</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={cameraPosition.y.toFixed(2)}
+                  onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, y: parseFloat(e.target.value) || 0 })}
+                  style={{
+                    flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+                    border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
+                    width: 80,
+                  }}
+                />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'rgba(0, 0, 0, 0.5)' }}>Z:</span>
-                <span style={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>{cameraPosition.z.toFixed(3)}</span>
+              {/* Camera Z */}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Z:</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={cameraPosition.z.toFixed(2)}
+                  onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, z: parseFloat(e.target.value) || 0 })}
+                  style={{
+                    flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+                    border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
+                    width: 80,
+                  }}
+                />
               </div>
             </div>
             <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', marginTop: 8, paddingTop: 8 }}>
               <div style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.35)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
                 Look At
               </div>
-              <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 11, color: 'rgba(0, 0, 0, 0.6)' }}>
-                ({cameraPosition.targetX.toFixed(2)}, {cameraPosition.targetY.toFixed(2)}, {cameraPosition.targetZ.toFixed(2)})
+              <div style={{ fontFamily: 'SF Mono, monospace', fontSize: 12 }}>
+                {/* Target X */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>X:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={cameraPosition.targetX.toFixed(2)}
+                    onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, targetX: parseFloat(e.target.value) || 0 })}
+                    style={{
+                      flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+                      border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
+                      width: 80,
+                    }}
+                  />
+                </div>
+                {/* Target Y */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Y:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={cameraPosition.targetY.toFixed(2)}
+                    onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, targetY: parseFloat(e.target.value) || 0 })}
+                    style={{
+                      flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+                      border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
+                      width: 80,
+                    }}
+                  />
+                </div>
+                {/* Target Z */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>Z:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={cameraPosition.targetZ.toFixed(2)}
+                    onChange={(e) => onSetCameraPosition?.({ ...cameraPosition, targetZ: parseFloat(e.target.value) || 0 })}
+                    style={{
+                      flex: 1, marginLeft: 8, padding: '2px 6px', fontSize: 12, fontFamily: 'SF Mono, monospace',
+                      border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, background: 'rgba(255,255,255,0.8)',
+                      width: 80,
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </LiquidGlass>
