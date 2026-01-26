@@ -26,36 +26,53 @@ fi
 echo "Checking Python version..."
 PYTHON_CMD=""
 
-# Check Homebrew Python versions (prefer newer)
-for version in 3.13 3.12 3.11 3.10; do
-    if [ -x "/opt/homebrew/opt/python@$version/bin/python$version" ]; then
-        PYTHON_CMD="/opt/homebrew/opt/python@$version/bin/python$version"
-        break
-    elif [ -x "/usr/local/opt/python@$version/bin/python$version" ]; then
-        PYTHON_CMD="/usr/local/opt/python@$version/bin/python$version"
-        break
+# Function to check if Python version is 3.10+
+check_python_version() {
+    local python_path="$1"
+    if [ -x "$python_path" ]; then
+        local version=$("$python_path" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)
+        local major=$(echo "$version" | cut -d. -f1)
+        local minor=$(echo "$version" | cut -d. -f2)
+        if [ "$major" -eq 3 ] && [ "$minor" -ge 10 ]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Search Homebrew Python installations (Apple Silicon and Intel paths)
+for brew_base in /opt/homebrew/opt /usr/local/opt; do
+    if [ -d "$brew_base" ]; then
+        # Find all python@3.* directories, sort by version descending
+        for python_dir in $(ls -d "$brew_base"/python@3.* 2>/dev/null | sort -t@ -k2 -rV); do
+            version_num=$(basename "$python_dir" | sed 's/python@//')
+            python_path="$python_dir/bin/python$version_num"
+            if version=$(check_python_version "$python_path"); then
+                PYTHON_CMD="$python_path"
+                PYTHON_VERSION="$version"
+                break 2
+            fi
+        done
     fi
 done
 
 # Fall back to system python3 if new enough
 if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
-    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
-    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
-    if [ "$PYTHON_MAJOR" -ge 3 ] && [ "$PYTHON_MINOR" -ge 10 ]; then
+    if version=$(check_python_version "$(which python3)"); then
         PYTHON_CMD="python3"
+        PYTHON_VERSION="$version"
     fi
 fi
 
 if [ -z "$PYTHON_CMD" ]; then
     echo -e "${RED}Error: Python 3.10 or higher is required.${NC}"
     echo ""
-    echo "Install Python 3.13 via Homebrew:"
+    echo "Install Python via Homebrew:"
     echo "  brew install python@3.13"
     exit 1
 fi
 
-PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 echo -e "${GREEN}Found Python $PYTHON_VERSION at $PYTHON_CMD${NC}"
 
 # Set up installation directory
