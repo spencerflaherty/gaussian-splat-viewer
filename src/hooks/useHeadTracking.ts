@@ -42,6 +42,8 @@ const FACE_WIDTH_SENSITIVITY = 3.0;     // How much face width change maps to Z 
 export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAULT_DEAD_ZONE) {
     const [position, setPosition] = useState<HeadPosition>({ x: 0, y: 0, z: 0 });
     const [initializing, setInitializing] = useState(true);
+    const [calibrationProgress, setCalibrationProgress] = useState(0);
+    const [isCalibrated, setIsCalibrated] = useState(false);
 
     // Raw position ref (updated every frame)
     const rawPositionRef = useRef<HeadPosition>({ x: 0, y: 0, z: 0 });
@@ -56,6 +58,15 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
     // Baseline face width (calibrated on first detection)
     const baselineFaceWidthRef = useRef<number | null>(null);
     const calibrationFramesRef = useRef<number[]>([]);
+
+    // Recalibrate function - resets calibration and starts fresh
+    const recalibrate = useCallback(() => {
+        baselineFaceWidthRef.current = null;
+        calibrationFramesRef.current = [];
+        setCalibrationProgress(0);
+        setIsCalibrated(false);
+        console.log('[HeadTracking] Recalibration started');
+    }, []);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const landmarkerRef = useRef<FaceLandmarker | null>(null);
@@ -127,10 +138,12 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
                         // Calibrate baseline on first few frames
                         if (baselineFaceWidthRef.current === null) {
                             calibrationFramesRef.current.push(currentFaceWidth);
+                            setCalibrationProgress(calibrationFramesRef.current.length);
                             if (calibrationFramesRef.current.length >= 30) {
                                 // Use median of first 30 frames as baseline
                                 const sorted = [...calibrationFramesRef.current].sort((a, b) => a - b);
                                 baselineFaceWidthRef.current = sorted[Math.floor(sorted.length / 2)];
+                                setIsCalibrated(true);
                                 console.log('[HeadTracking] Baseline face width calibrated:', baselineFaceWidthRef.current.toFixed(4));
                             }
                         }
@@ -278,6 +291,10 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
         positionRef: smoothedPositionRef,  // Smoothed position ref for camera updates
         rawPositionRef,              // Raw position ref (unsmoothed)
         initializing,
-        videoRef
+        videoRef,
+        // Calibration state
+        calibrationProgress,         // 0-30 frames collected
+        isCalibrated,                // Whether baseline is established
+        recalibrate,                 // Function to trigger recalibration
     };
 }

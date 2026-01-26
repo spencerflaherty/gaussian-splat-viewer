@@ -3,19 +3,26 @@ import { Slider } from '../ui/Slider';
 import { useSettingsStore } from '../../stores';
 import type { HeadTrackingParams } from '../viewer/SplatViewer';
 
-// Slider configuration with actual min/max values
-const SLIDER_CONFIG: Record<string, { min: number; max: number; step: number; label: string }> = {
-  sensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Sensitivity' },
-  distance: { min: 0.5, max: 20, step: 0.1, label: 'Distance' },
+// Slider configuration with actual min/max values and optional semantic labels
+const SLIDER_CONFIG: Record<string, {
+  min: number;
+  max: number;
+  step: number;
+  label: string;
+  minLabel?: string;
+  maxLabel?: string;
+}> = {
+  sensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Sensitivity', minLabel: 'Subtle', maxLabel: 'Dramatic' },
+  distance: { min: 0.5, max: 20, step: 0.1, label: 'Distance', minLabel: 'Close', maxLabel: 'Far' },
   screenSize: { min: 0.1, max: 5, step: 0.01, label: 'Screen Size' },
   verticalOffset: { min: -1.0, max: 2.0, step: 0.01, label: 'Vertical Offset' },
-  depthSensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Depth Sensitivity' },
+  depthSensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Depth Sensitivity', minLabel: 'Off', maxLabel: 'Strong' },
   cameraX: { min: -20, max: 20, step: 0.1, label: 'Camera X' },
   cameraY: { min: -20, max: 20, step: 0.1, label: 'Camera Y' },
   cameraZ: { min: -20, max: 20, step: 0.1, label: 'Camera Z' },
   focusDepth: { min: -50, max: 50, step: 0.1, label: 'Focus Depth' },
-  smoothing: { min: 0.01, max: 0.5, step: 0.01, label: 'Smoothing' },
-  deadZone: { min: 0, max: 0.1, step: 0.001, label: 'Dead Zone' },
+  smoothing: { min: 0.01, max: 0.5, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth' },
+  deadZone: { min: 0, max: 0.1, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large' },
 };
 
 // Only use these for numeric params
@@ -25,6 +32,8 @@ export interface SettingsPanelProps {
   visible: boolean;
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
+  /** Whether to highlight the panel to draw attention (for first-time users) */
+  highlight?: boolean;
 }
 
 /**
@@ -37,6 +46,7 @@ export function SettingsPanel({
   visible,
   showSettings,
   setShowSettings,
+  highlight = false,
 }: SettingsPanelProps) {
   // Get settings from store
   const params = useSettingsStore((s) => s.params);
@@ -60,6 +70,8 @@ export function SettingsPanel({
         max={config.max}
         step={config.step}
         onChange={(newValue) => updateParam(param, newValue)}
+        minLabel={config.minLabel}
+        maxLabel={config.maxLabel}
       />
     );
   };
@@ -74,7 +86,11 @@ export function SettingsPanel({
       pointerEvents: visible ? 'auto' : 'none',
       maxHeight: 'calc(100vh - 160px)',
     }}>
-      <LiquidGlass variant="sidebar" style={{ width: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
+      <LiquidGlass
+        variant="sidebar"
+        className={highlight ? 'animate-attention' : ''}
+        style={{ width: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}
+      >
         <button
           onClick={() => setShowSettings(!showSettings)}
           style={{

@@ -5,6 +5,8 @@ import { HUDOverlay } from './components/controls/HUD';
 import { DropZone } from './components/upload/DropZone';
 import { useSettingsStore, useViewerStore } from './stores';
 
+const HAS_SEEN_SETTINGS_KEY = 'splat-viewer-has-seen-settings';
+
 const STAGE_INFO: Record<string, { label: string; progress: number }> = {
   idle: { label: '', progress: 0 },
   uploading: { label: 'Uploading...', progress: 10 },
@@ -42,11 +44,35 @@ function App() {
   } = useViewerStore();
 
   // Head tracking with params from settings store
-  const { positionRef, videoRef } = useHeadTracking(params.smoothing, params.deadZone);
+  const {
+    positionRef,
+    videoRef,
+    calibrationProgress,
+    isCalibrated,
+    recalibrate,
+  } = useHeadTracking(params.smoothing, params.deadZone);
 
   const hideControlsTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
+  const hasCheckedSettingsRef = useRef(false);
+  const [highlightSettings, setHighlightSettings] = useState(false);
+
+  // Show settings panel on first use when entering head tracking mode
+  useEffect(() => {
+    if (controlMode === 'head' && splatUrl && !hasCheckedSettingsRef.current) {
+      hasCheckedSettingsRef.current = true;
+      const hasSeenSettings = localStorage.getItem(HAS_SEEN_SETTINGS_KEY);
+      if (!hasSeenSettings) {
+        // First time user - show settings panel open and highlight it
+        setShowSettings(true);
+        setHighlightSettings(true);
+        localStorage.setItem(HAS_SEEN_SETTINGS_KEY, 'true');
+        // Clear highlight after animation completes (3 cycles * 2s = 6s)
+        setTimeout(() => setHighlightSettings(false), 6000);
+      }
+    }
+  }, [controlMode, splatUrl, setShowSettings]);
 
   // Backend health check
   useEffect(() => {
@@ -242,6 +268,10 @@ function App() {
           setShowSettings={setShowSettings}
           darkBackground={darkBackground}
           setDarkBackground={setDarkBackground}
+          calibrationProgress={calibrationProgress}
+          isCalibrated={isCalibrated}
+          onRecalibrate={recalibrate}
+          highlightSettings={highlightSettings}
         />
       )}
     </div>

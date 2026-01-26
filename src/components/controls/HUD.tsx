@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { LiquidGlass } from '../ui/LiquidGlass';
 import { ModeSwitcher } from './ModeSwitcher';
 import { SettingsPanel } from './SettingsPanel';
+import { CalibrationWizard } from './CalibrationWizard';
 
 export interface HUDOverlayProps {
   showControls: boolean;
@@ -14,6 +15,12 @@ export interface HUDOverlayProps {
   setShowSettings: (show: boolean) => void;
   darkBackground: boolean;
   setDarkBackground: (dark: boolean) => void;
+  // Calibration props
+  calibrationProgress: number;
+  isCalibrated: boolean;
+  onRecalibrate: () => void;
+  // First-use highlight
+  highlightSettings?: boolean;
 }
 
 /**
@@ -35,6 +42,10 @@ export function HUDOverlay({
   setShowSettings,
   darkBackground,
   setDarkBackground,
+  calibrationProgress,
+  isCalibrated,
+  onRecalibrate,
+  highlightSettings = false,
 }: HUDOverlayProps) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 999999, pointerEvents: 'none' }}>
@@ -147,6 +158,17 @@ export function HUDOverlay({
           visible={showControls}
           showSettings={showSettings}
           setShowSettings={setShowSettings}
+          highlight={highlightSettings}
+        />
+      )}
+
+      {/* Calibration Wizard */}
+      {controlMode === 'head' && (
+        <CalibrationWizard
+          visible={showControls}
+          progress={calibrationProgress}
+          isCalibrated={isCalibrated}
+          onRecalibrate={onRecalibrate}
         />
       )}
     </div>,

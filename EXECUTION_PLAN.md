@@ -176,39 +176,39 @@ Work through EXECUTION_PLAN.md systematically. Complete each task, validate it w
 ## Phase 3: Settings UX Overhaul
 
 ### Task 3.1: Create Presets UI
-- [ ] Add preset buttons to SettingsPanel: Subtle, Natural, Dramatic
-- [ ] Define preset values in settingsStore
-- [ ] One-click applies all settings
+- [x] Add preset buttons to SettingsPanel: Subtle, Natural, Dramatic
+- [x] Define preset values in settingsStore
+- [x] One-click applies all settings
 
-**Validation:** Clicking preset changes all values
+**Validation:** Clicking preset changes all values ✅ (Done in Phase 2)
 
 ### Task 3.2: Fix Slider Value Display
-- [ ] Sliders show ACTUAL values, not offsets
-- [ ] Remove toSliderValue/fromSliderValue functions
-- [ ] Update Slider component to use actual min/max
+- [x] Sliders show ACTUAL values, not offsets
+- [x] Remove toSliderValue/fromSliderValue functions
+- [x] Update Slider component to use actual min/max
 
-**Validation:** "Distance" slider shows "2.5" when at default
+**Validation:** "Distance" slider shows "2.5" when at default ✅ (Done in Phase 1)
 
 ### Task 3.3: Add Semantic Labels to Sliders
-- [ ] Add "Subtle" / "Dramatic" labels at slider ends where appropriate
-- [ ] Keep numeric input for precise control
+- [x] Add "Subtle" / "Dramatic" labels at slider ends where appropriate
+- [x] Keep numeric input for precise control
 
-**Validation:** Sliders have helpful context labels
+**Validation:** Sliders have helpful context labels ✅
 
 ### Task 3.4: Create Calibration Wizard
-- [ ] Create `src/components/controls/CalibrationWizard.tsx`
-- [ ] Show progress during 30-frame calibration
-- [ ] "Hold still" instruction
-- [ ] Recalibrate button
+- [x] Create `src/components/controls/CalibrationWizard.tsx`
+- [x] Show progress during 30-frame calibration
+- [x] "Hold still" instruction
+- [x] Recalibrate button
 
-**Validation:** User sees calibration progress, can recalibrate
+**Validation:** User sees calibration progress, can recalibrate ✅
 
 ### Task 3.5: Improve Settings Discoverability
-- [ ] Settings panel visible by default on first use
-- [ ] Add subtle animation to draw attention
-- [ ] Store "has seen settings" in localStorage
+- [x] Settings panel visible by default on first use
+- [x] Add subtle animation to draw attention
+- [x] Store "has seen settings" in localStorage
 
-**Validation:** New users see settings, returning users don't
+**Validation:** New users see settings, returning users don't ✅
 
 ---
 
@@ -473,7 +473,7 @@ npm run dev
 | Phase 0: Library Migration | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 1: Component Extraction | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 2: State Management | Complete | 2025-01-25 | 2025-01-25 |
-| Phase 3: Settings UX | Not Started | | |
+| Phase 3: Settings UX | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 4: Performance | Not Started | | |
 | Phase 5: Backend | Not Started | | |
 | Phase 6: CSS Consolidation | Not Started | | |

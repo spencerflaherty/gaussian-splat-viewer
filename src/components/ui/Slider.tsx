@@ -17,6 +17,10 @@ export interface SliderProps {
   decimals?: number;
   /** Custom style overrides */
   style?: CSSProperties;
+  /** Label for minimum end (e.g., "Subtle") */
+  minLabel?: string;
+  /** Label for maximum end (e.g., "Dramatic") */
+  maxLabel?: string;
 }
 
 /**
@@ -24,6 +28,7 @@ export interface SliderProps {
  *
  * Displays the ACTUAL value (not offset from default) for clarity.
  * Supports both drag slider and direct numeric input.
+ * Optionally shows semantic labels at slider ends.
  */
 export function Slider({
   label,
@@ -34,6 +39,8 @@ export function Slider({
   onChange,
   decimals = 2,
   style,
+  minLabel,
+  maxLabel,
 }: SliderProps) {
   const handleTextChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
@@ -49,6 +56,8 @@ export function Slider({
 
   // Calculate fill percentage for gradient background
   const fillPercent = ((value - min) / (max - min)) * 100;
+
+  const hasLabels = minLabel || maxLabel;
 
   return (
     <div style={{ marginBottom: 14, ...style }}>
@@ -106,6 +115,22 @@ export function Slider({
           cursor: 'pointer',
         }}
       />
+      {hasLabels && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: 4,
+          }}
+        >
+          <span style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.4)', fontWeight: 500 }}>
+            {minLabel || ''}
+          </span>
+          <span style={{ fontSize: 10, color: 'rgba(0, 0, 0, 0.4)', fontWeight: 500 }}>
+            {maxLabel || ''}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
