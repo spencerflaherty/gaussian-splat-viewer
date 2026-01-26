@@ -4,6 +4,7 @@ import { useSettingsStore } from '../../stores';
 import type { HeadTrackingParams } from '../viewer/SplatViewer';
 
 // Slider configuration with actual min/max values and optional semantic labels
+// Ranges are centered around calibrated defaults (sensitivity: 0.01, depthSensitivity: 0.05)
 const SLIDER_CONFIG: Record<string, {
   min: number;
   max: number;
@@ -12,18 +13,18 @@ const SLIDER_CONFIG: Record<string, {
   minLabel?: string;
   maxLabel?: string;
 }> = {
-  // Motion settings
-  sensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Movement Scale', minLabel: 'Subtle', maxLabel: 'Dramatic' },
-  depthSensitivity: { min: 0, max: 1.0, step: 0.01, label: 'Zoom Effect', minLabel: 'Off', maxLabel: 'Strong' },
+  // Motion settings - very subtle range centered at 0.01
+  sensitivity: { min: 0, max: 0.1, step: 0.001, label: 'Movement Scale', minLabel: 'None', maxLabel: 'Strong' },
+  depthSensitivity: { min: 0, max: 0.2, step: 0.005, label: 'Zoom Effect', minLabel: 'Off', maxLabel: 'Strong' },
 
-  // Camera offsets (additive adjustments)
-  cameraX: { min: -5, max: 5, step: 0.1, label: 'X Offset' },
-  cameraY: { min: -5, max: 5, step: 0.1, label: 'Y Offset' },
-  cameraZ: { min: -5, max: 5, step: 0.1, label: 'Z Offset' },
+  // Camera offsets (fine adjustments centered at calibrated values)
+  cameraX: { min: -1, max: 1, step: 0.01, label: 'X Offset' },
+  cameraY: { min: -1, max: 1, step: 0.01, label: 'Y Offset' },
+  cameraZ: { min: -2, max: 1, step: 0.01, label: 'Z Offset' },
 
   // Smoothing
   smoothing: { min: 0.05, max: 0.5, step: 0.01, label: 'Smoothing', minLabel: 'Responsive', maxLabel: 'Smooth' },
-  deadZone: { min: 0, max: 0.05, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large' },
+  deadZone: { min: 0, max: 0.02, step: 0.001, label: 'Dead Zone', minLabel: 'None', maxLabel: 'Large' },
 };
 
 // Only use these for numeric params

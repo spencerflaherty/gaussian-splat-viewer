@@ -118,30 +118,49 @@ export function ConversionProgress({
         const decoder = new TextDecoder();
         let buffer = '';
 
+        console.log('[ConversionProgress] Starting to read SSE stream');
+
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            console.log('[ConversionProgress] Stream ended');
+            break;
+          }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
 
-          for (const eventBlock of lines) {
+          // SSE events are separated by double newlines
+          const events = buffer.split('\n\n');
+          // Keep the last partial event in buffer
+          buffer = events.pop() || '';
+
+          for (const eventBlock of events) {
             if (!eventBlock.trim()) continue;
 
-            // Parse SSE event
-            const eventMatch = eventBlock.match(/event:\s*(\w+)/);
-            const dataMatch = eventBlock.match(/data:\s*(.+)/);
+            // Parse SSE event - handle both single-line and multi-line formats
+            const lines = eventBlock.split('\n');
+            let eventType = '';
+            let dataStr = '';
 
-            if (eventMatch && dataMatch) {
-              const eventType = eventMatch[1];
+            for (const line of lines) {
+              if (line.startsWith('event:')) {
+                eventType = line.slice(6).trim();
+              } else if (line.startsWith('data:')) {
+                dataStr = line.slice(5).trim();
+              }
+            }
+
+            if (eventType && dataStr) {
               try {
-                const data = JSON.parse(dataMatch[1]) as JobStatus;
+                const data = JSON.parse(dataStr) as JobStatus;
+                console.log('[ConversionProgress] Received:', eventType, 'progress:', data.progress);
                 jobIdRef.current = data.job_id;
                 setStatus(data);
 
                 if (eventType === 'complete') {
                   // Fetch the result
+                  console.log('[ConversionProgress] Fetching result...');
                   const resultResponse = await fetch(
                     `${backendUrl}/job/${data.job_id}/result`
                   );
@@ -154,9 +173,7 @@ export function ConversionProgress({
                   onError(data.error || 'Conversion failed');
                 }
               } catch (parseError) {
-                if (import.meta.env.DEV) {
-                  console.warn('[ConversionProgress] Parse error:', parseError);
-                }
+                console.warn('[ConversionProgress] Parse error:', parseError, 'data:', dataStr);
               }
             }
           }

@@ -361,7 +361,9 @@ def downsample_ply(input_path: Path, output_path: Path, keep_percentage: int):
 
 def format_sse_event(event: str, data: dict) -> str:
     """Format data as Server-Sent Event."""
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+    result = f"event: {event}\ndata: {json.dumps(data)}\n\n"
+    print(f"[SSE] Sending event: {event}, progress: {data.get('progress', '?')}")
+    return result
 
 
 async def run_sharp_with_progress(
@@ -595,6 +597,9 @@ async def convert_image_stream(
     )
 
     async def generate():
+        # Send initial event immediately
+        yield format_sse_event("progress", asdict(active_jobs[job_id]))
+
         async for event in run_sharp_with_progress(job_id, job_input_dir, job_output_dir, quality):
             yield event
 
@@ -602,9 +607,11 @@ async def convert_image_stream(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream",
+            "Transfer-Encoding": "chunked",
         }
     )
 

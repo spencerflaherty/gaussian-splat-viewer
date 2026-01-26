@@ -75,25 +75,25 @@ interface SplatViewerProps {
  * Default parameters tuned for natural "looking around the corner" experience.
  * Move your head to peek around the scene as if looking through a window.
  *
- * These values are calibrated based on extensive user testing.
+ * These values are calibrated based on user testing (Jan 2025).
  */
 export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     // Core - tuned for camera translation approach
     distance: 2.5,           // Not used in new approach but kept for compatibility
-    sensitivity: 0.5,        // How much the camera moves relative to head movement
+    sensitivity: 0.01,       // Very subtle camera movement (calibrated)
     screenSize: 0.5,         // Not used in new approach but kept for compatibility
     verticalOffset: 0,       // Not used in new approach
 
-    // Camera offsets - added to head tracking movement
-    cameraX: 0,              // Additional X offset (manual adjustment)
-    cameraY: 0,              // Additional Y offset (manual adjustment)
-    cameraZ: 0,              // Additional Z offset (manual adjustment)
+    // Camera offsets - added to head tracking movement (calibrated)
+    cameraX: 0.10,           // Slight X offset to center view
+    cameraY: 0,              // No Y offset needed
+    cameraZ: -0.50,          // Pull camera back slightly
 
     // Focus
     focusDepth: 0,           // Not used in new approach but kept for compatibility
 
     // Depth tracking
-    depthSensitivity: 0.3,   // How much lean in/out affects zoom
+    depthSensitivity: 0.05,  // Very subtle zoom effect (calibrated)
 
     // Smoothing
     smoothing: 0.15,         // Lower = smoother but more latency
@@ -105,7 +105,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     enableZ: true,           // Depth/zoom tracking
 
     // Axis inversion - calibrated for natural movement
-    invertX: false,          // Move head left -> camera moves left -> see right side
+    invertX: true,           // Flip X axis (calibrated)
     invertY: false,          // Move head up -> camera moves up -> see bottom
     invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };
