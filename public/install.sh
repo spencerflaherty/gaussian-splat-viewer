@@ -124,7 +124,20 @@ echo ""
 echo "Installing SHARP..."
 pip install -e ml-sharp/
 
-# Create convenience script
+# Install Node.js dependencies for frontend
+echo ""
+echo "Installing frontend dependencies..."
+if command -v npm &> /dev/null; then
+    npm install
+else
+    echo -e "${YELLOW}npm not found. Install Node.js to run the frontend locally.${NC}"
+    echo "  brew install node"
+fi
+
+# Create convenience scripts
+mkdir -p "$HOME/.local/bin"
+
+# Backend only script
 echo ""
 echo "Creating splat-backend command..."
 cat > "$HOME/.local/bin/splat-backend" << 'SCRIPT'
@@ -133,16 +146,44 @@ cd "$HOME/.splat-window/repo"
 source .venv/bin/activate
 python server/main.py
 SCRIPT
-
-mkdir -p "$HOME/.local/bin"
 chmod +x "$HOME/.local/bin/splat-backend"
+
+# Full app script (frontend + backend)
+echo "Creating splat-viewer command..."
+cat > "$HOME/.local/bin/splat-viewer" << 'SCRIPT'
+#!/bin/bash
+cd "$HOME/.splat-window/repo"
+source .venv/bin/activate
+
+echo "Starting Splat Viewer..."
+echo "Backend: http://localhost:8000"
+echo "Frontend: http://localhost:5173"
+echo ""
+echo "Press Ctrl+C to stop both servers"
+echo ""
+
+# Start backend in background
+python server/main.py &
+BACKEND_PID=$!
+
+# Start frontend
+npm run dev &
+FRONTEND_PID=$!
+
+# Wait for either to exit
+wait $BACKEND_PID $FRONTEND_PID
+
+# Cleanup on exit
+trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT
+SCRIPT
+chmod +x "$HOME/.local/bin/splat-viewer"
 
 # Add to PATH if needed
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo ""
-    echo -e "${YELLOW}Note: Add ~/.local/bin to your PATH:${NC}"
-    echo '  echo '\''export PATH="$HOME/.local/bin:$PATH"'\'' >> ~/.zshrc'
-    echo '  source ~/.zshrc'
+    echo -e "${YELLOW}Adding ~/.local/bin to your PATH...${NC}"
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 echo ""
@@ -150,16 +191,23 @@ echo "=============================================="
 echo -e "${GREEN}Installation Complete!${NC}"
 echo "=============================================="
 echo ""
-echo "To start the backend server:"
+echo "To start the full app (frontend + backend):"
+echo -e "  ${GREEN}splat-viewer${NC}"
+echo ""
+echo "Or backend only:"
 echo "  splat-backend"
 echo ""
-echo "Or manually:"
-echo "  cd $INSTALL_DIR/repo"
-echo "  source .venv/bin/activate"
-echo "  python server/main.py"
-echo ""
-echo "The backend will run on http://localhost:8000"
+echo "The app will open at http://localhost:5173"
 echo ""
 echo -e "${YELLOW}Note: The first image conversion will download the"
 echo -e "SHARP model (~2.6GB). This only happens once.${NC}"
 echo ""
+
+# Ask if user wants to start now
+read -p "Start the app now? [Y/n] " -n 1 -r
+echo ""
+if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+    echo ""
+    echo "Starting Splat Viewer..."
+    splat-viewer
+fi

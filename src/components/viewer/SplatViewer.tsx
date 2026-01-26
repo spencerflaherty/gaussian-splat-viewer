@@ -355,28 +355,65 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         };
     }, [url, format]);
 
-    // Toggle controls based on mode
+    // Store last orbit camera position to preserve when switching modes
+    const lastOrbitCameraRef = useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+
+    // Toggle controls based on mode - preserve camera position between modes
     useEffect(() => {
         if (!viewerRef.current || loading) return;
 
         const viewer = viewerRef.current;
 
-        if (viewer.controls) {
-            viewer.controls.enabled = (controlMode === 'orbit');
-            if (import.meta.env.DEV) console.log(`[SplatWindow] Controls ${controlMode === 'orbit' ? 'enabled' : 'disabled'} for ${controlMode} mode`);
+        if (viewer.controls && viewer.camera) {
+            // Switching TO orbit mode - restore last orbit position or use current
+            if (controlMode === 'orbit') {
+                viewer.controls.enabled = true;
 
-            // When switching to orbit mode, reset camera to a reasonable position
-            if (controlMode === 'orbit' && viewer.camera) {
-                const camZ = params.distance + params.cameraZ;
-                const camY = params.verticalOffset * params.screenSize + params.cameraY;
-                const camX = params.cameraX;
-                viewer.camera.position.set(camX, camY, camZ);
-                viewer.camera.lookAt(params.cameraX, params.cameraY, params.focusDepth);
+                if (lastOrbitCameraRef.current) {
+                    // Restore saved orbit position
+                    viewer.camera.position.copy(lastOrbitCameraRef.current.position);
+                    if (viewer.controls.target) {
+                        viewer.controls.target.copy(lastOrbitCameraRef.current.target);
+                    }
+                    viewer.camera.lookAt(lastOrbitCameraRef.current.target);
+                }
+                // If no saved position, keep current camera position (from head tracking)
                 viewer.camera.updateMatrixWorld(true);
-                if (import.meta.env.DEV) console.log('[SplatWindow] Reset camera for orbit mode');
+                viewer.controls.update();
+                if (import.meta.env.DEV) console.log('[SplatWindow] Enabled orbit controls, camera preserved');
+            }
+            // Switching TO head tracking mode - use orbit camera position as base
+            else {
+                // Save current orbit camera position for reference
+                if (viewer.controls.enabled) {
+                    const pos = viewer.camera.position;
+                    const target = viewer.controls.target || new THREE.Vector3(0, 0, 0);
+                    lastOrbitCameraRef.current = {
+                        position: pos.clone(),
+                        target: target.clone(),
+                    };
+
+                    // Update the camera offset params to match orbit position
+                    // This makes head tracking work relative to where user positioned in orbit mode
+                    const currentParams = paramsRef.current;
+                    const baseZ = currentParams.distance;
+
+                    // Calculate what offsets would put camera at current orbit position
+                    paramsRef.current = {
+                        ...currentParams,
+                        cameraX: pos.x,
+                        cameraY: pos.y - (currentParams.verticalOffset * currentParams.screenSize),
+                        cameraZ: pos.z - baseZ,
+                        focusDepth: target.z,
+                    };
+
+                    if (import.meta.env.DEV) console.log('[SplatWindow] Updated head tracking base to orbit position:', pos.toArray());
+                }
+                viewer.controls.enabled = false;
+                if (import.meta.env.DEV) console.log('[SplatWindow] Disabled orbit controls for head tracking');
             }
         }
-    }, [controlMode, loading, params]);
+    }, [controlMode, loading]);
 
     // Head tracking camera updates with off-axis projection
     useEffect(() => {

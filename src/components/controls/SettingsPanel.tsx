@@ -136,7 +136,10 @@ export function SettingsPanel({
         </button>
 
         {showSettings && (
-          <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+          <div
+            className="settings-scroll"
+            style={{ padding: 16, overflowY: 'auto', flex: 1, maxHeight: 'calc(100vh - 250px)' }}
+          >
             {/* Presets */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
