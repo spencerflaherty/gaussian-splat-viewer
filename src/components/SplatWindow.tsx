@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-// @ts-expect-error - no types available for this package
-import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+import { SplatViewer, SceneFormat } from '../lib/splatRenderer';
 import type { SmoothedHeadPosition } from '../hooks/useHeadTracking';
 
 /**
@@ -112,7 +111,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
 export function SplatWindow({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded }: SplatWindowProps) {
     const params = headTrackingParams ?? DEFAULT_HEAD_TRACKING_PARAMS;
     const containerRef = useRef<HTMLDivElement>(null);
-    const viewerRef = useRef<typeof GaussianSplats3D.Viewer | null>(null);
+    const viewerRef = useRef<SplatViewer | null>(null);
     const animationRef = useRef<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -171,27 +170,24 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
             const initialCamY = params.verticalOffset * params.screenSize + params.cameraY;
             const initialCamX = params.cameraX;
 
-            const viewer = new GaussianSplats3D.Viewer({
-                'rootElement': containerRef.current,
-                'cameraUp': [0, 1, 0],
-                'initialCameraPosition': [initialCamX, initialCamY, initialCamZ],
-                'initialCameraLookAt': [params.cameraX, params.cameraY, params.focusDepth],
-                'selfDrivenMode': true,
-                'useBuiltInControls': true,
-                'sharedMemoryForWorkers': false,
-                'gpuAcceleratedSort': false,
-                'antialiased': true,
+            const viewer = new SplatViewer({
+                rootElement: containerRef.current,
+                cameraUp: [0, 1, 0],
+                initialCameraPosition: [initialCamX, initialCamY, initialCamZ],
+                initialCameraLookAt: [params.cameraX, params.cameraY, params.focusDepth],
+                useBuiltInControls: true,
+                antialiased: false, // Better performance with Spark
             });
 
             viewerRef.current = viewer;
             console.log('[SplatWindow] Viewer created successfully');
 
-            // Determine scene format
+            // Determine scene format (kept for reference, Spark auto-detects)
             let sceneFormat: number | undefined;
             if (format === 'ply') {
-                sceneFormat = 2; // GaussianSplats3D.SceneFormat.Ply
+                sceneFormat = SceneFormat.Ply;
             } else if (format === 'splat') {
-                sceneFormat = 0; // GaussianSplats3D.SceneFormat.Splat
+                sceneFormat = SceneFormat.Splat;
             }
 
             // PLY files from SHARP need rotation fix (OpenCV -> Three.js coordinates)
@@ -199,17 +195,17 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
 
             setLoadProgress(30);
 
-            const sceneOptions: Record<string, unknown> = {
-                'showLoadingUI': false,
+            const sceneOptions: { format?: number; rotation?: [number, number, number, number]; showLoadingUI?: boolean } = {
+                showLoadingUI: false,
             };
 
             if (sceneFormat !== undefined) {
-                sceneOptions['format'] = sceneFormat;
+                sceneOptions.format = sceneFormat;
             }
 
             if (needsRotation) {
                 // Rotate 180° around X-axis: quaternion [sin(90°), 0, 0, cos(90°)] = [1, 0, 0, 0]
-                sceneOptions['rotation'] = [1, 0, 0, 0];
+                sceneOptions.rotation = [1, 0, 0, 0];
                 console.log('[SplatWindow] Applying rotation for PLY format (quaternion: [1, 0, 0, 0])');
             }
 
@@ -225,14 +221,8 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
                     console.log('[SplatWindow] Scene loaded successfully');
 
                     // Log splat count
-                    let splatCount = 0;
-                    if (typeof viewer.getSplatCount === 'function') {
-                        splatCount = viewer.getSplatCount();
-                        console.log('[SplatWindow] Splat count:', splatCount);
-                    } else if (viewer.splatMesh?.splatCount) {
-                        splatCount = viewer.splatMesh.splatCount;
-                        console.log('[SplatWindow] Splat count:', splatCount);
-                    }
+                    const splatCount = viewer.getSplatCount();
+                    console.log('[SplatWindow] Splat count:', splatCount);
 
                     setLoadProgress(80);
 
@@ -256,7 +246,6 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
                         });
                         if (!canvas) {
                             console.error('[SplatWindow] Canvas not found after viewer start!');
-                            // List all children
                             console.log('[SplatWindow] Container children:', container?.children);
                         } else {
                             console.log('[SplatWindow] Canvas verified:', canvas.width, 'x', canvas.height);
@@ -269,20 +258,12 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
                         }
                     }, 100);
 
-                    // Auto-fit camera to scene bounds
+                    // Auto-fit camera to scene bounds using SplatMesh bounding box
                     setTimeout(() => {
                         if (!viewer.camera || !viewer.splatMesh) return;
 
-                        const box = new THREE.Box3();
-                        if (viewer.splatMesh.geometry?.boundingBox) {
-                            box.copy(viewer.splatMesh.geometry.boundingBox);
-                        } else if (viewer.splatMesh.geometry) {
-                            viewer.splatMesh.geometry.computeBoundingBox();
-                            if (viewer.splatMesh.geometry.boundingBox) {
-                                box.copy(viewer.splatMesh.geometry.boundingBox);
-                            }
-                        }
-
+                        // Get bounding box from SplatMesh
+                        const box = viewer.splatMesh.getBoundingBox();
                         box.applyMatrix4(viewer.splatMesh.matrixWorld);
 
                         const center = box.getCenter(new THREE.Vector3());
@@ -309,9 +290,9 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
 
                         // Configure orbit controls sensitivity (lower = less sensitive)
                         if (viewer.controls) {
-                            viewer.controls.rotateSpeed = 0.3;  // Default is 1.0
-                            viewer.controls.panSpeed = 0.3;     // Default is 1.0
-                            viewer.controls.zoomSpeed = 0.5;    // Default is 1.0
+                            viewer.controls.rotateSpeed = 0.3;
+                            viewer.controls.panSpeed = 0.3;
+                            viewer.controls.zoomSpeed = 0.5;
                             console.log('[SplatWindow] Orbit controls sensitivity reduced');
                         }
                     }, 200);
@@ -325,7 +306,7 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
 
                     if (!isActive) return;
 
-                    if (!isActive && (err.message?.includes('disposed') || err.message?.includes('abort'))) {
+                    if (err.message?.includes('disposed') || err.message?.includes('abort')) {
                         console.log('[SplatWindow] Scene load aborted (cleanup)');
                         return;
                     }
@@ -365,23 +346,17 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
         };
     }, [url, format]);
 
-    // Debug loop
+    // Debug loop (only in development)
     useEffect(() => {
+        if (import.meta.env.PROD) return; // Skip debug loop in production
+
         let debugCounter = 0;
         const interval = setInterval(() => {
             if (!viewerRef.current) return;
 
             const viewer = viewerRef.current;
             const camera = viewer.camera;
-
-            let count = 0;
-            if (typeof viewer.getSplatCount === 'function') {
-                count = viewer.getSplatCount();
-            } else if (viewer.splatMesh?.splatCount) {
-                count = viewer.splatMesh.splatCount;
-            } else if (viewer.splatMesh?.geometry?.attributes?.position?.count) {
-                count = viewer.splatMesh.geometry.attributes.position.count;
-            }
+            const count = viewer.getSplatCount();
 
             debugCounter++;
             if (debugCounter % 10 === 0) {
@@ -391,25 +366,6 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
                     cameraPos: camera ? `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}` : 'N/A'
                 });
             }
-
-            // Debug stats update (uncomment if needed)
-            // if (camera) {
-            //     setDebugStats({
-            //         splatCount: count,
-            //         cameraPos: {
-            //             x: parseFloat(camera.position.x.toFixed(2)),
-            //             y: parseFloat(camera.position.y.toFixed(2)),
-            //             z: parseFloat(camera.position.z.toFixed(2))
-            //         },
-            //         cameraRot: {
-            //             x: parseFloat(camera.rotation.x.toFixed(2)),
-            //             y: parseFloat(camera.rotation.y.toFixed(2)),
-            //             z: parseFloat(camera.rotation.z.toFixed(2))
-            //         },
-            //         isRenderLoopActive: true,
-            //         controlsEnabled: viewer.controls?.enabled ?? false
-            //     });
-            // }
         }, 500);
 
         return () => clearInterval(interval);

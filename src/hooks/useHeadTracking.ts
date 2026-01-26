@@ -37,7 +37,6 @@ const DEFAULT_DEAD_ZONE = 0.005;
  */
 const FACE_WIDTH_LEFT_LANDMARK = 234;   // Left side of face
 const FACE_WIDTH_RIGHT_LANDMARK = 454;  // Right side of face
-const NEUTRAL_FACE_WIDTH = 0.45;        // Expected face width at "neutral" distance (normalized 0-1)
 const FACE_WIDTH_SENSITIVITY = 3.0;     // How much face width change maps to Z change
 
 export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAULT_DEAD_ZONE) {

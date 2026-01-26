@@ -95,61 +95,6 @@ function LiquidGlass({ children, className = '', style = {}, variant = 'default'
   );
 }
 
-// iOS-style Toggle Switch
-function Toggle({ checked, onChange, label }: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label?: string;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        padding: 0,
-      }}
-    >
-      {label && (
-        <span style={{ fontSize: 14, color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>
-          {label}
-        </span>
-      )}
-      <div
-        style={{
-          width: 51,
-          height: 31,
-          borderRadius: 16,
-          background: checked
-            ? 'linear-gradient(180deg, #34C759 0%, #30B350 100%)'
-            : 'rgba(120, 120, 128, 0.2)',
-          padding: 2,
-          transition: 'background 0.2s ease',
-          boxShadow: checked
-            ? 'inset 0 0 0 0.5px rgba(0,0,0,0.04)'
-            : 'inset 0 0 0 0.5px rgba(0,0,0,0.06)',
-        }}
-      >
-        <div
-          style={{
-            width: 27,
-            height: 27,
-            borderRadius: 14,
-            background: 'white',
-            boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.06)',
-            transform: checked ? 'translateX(20px)' : 'translateX(0)',
-            transition: 'transform 0.2s ease',
-          }}
-        />
-      </div>
-    </button>
-  );
-}
-
 // HUD Overlay
 function HUDOverlay({
   showControls,
