@@ -115,6 +115,9 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<SplatViewerLib | null>(null);
     const animationRef = useRef<number | null>(null);
+    // Track latest params in ref to avoid stale closures in RAF callback
+    const paramsRef = useRef(params);
+    paramsRef.current = params;  // Always keep ref in sync with latest params
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadProgress, setLoadProgress] = useState(0);
@@ -137,13 +140,15 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
 
         let isActive = true;
 
-        console.log('[SplatWindow] Initializing viewer...');
-        console.log('[SplatWindow] URL:', url);
-        console.log('[SplatWindow] Format:', format);
+        if (import.meta.env.DEV) {
+            console.log('[SplatWindow] Initializing viewer...');
+            console.log('[SplatWindow] URL:', url);
+            console.log('[SplatWindow] Format:', format);
+        }
 
         // Clean up previous viewer
         if (viewerRef.current) {
-            console.log('[SplatWindow] Disposing previous viewer');
+            if (import.meta.env.DEV) console.log('[SplatWindow] Disposing previous viewer');
             try {
                 viewerRef.current.dispose();
             } catch (e) {
@@ -182,7 +187,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
             });
 
             viewerRef.current = viewer;
-            console.log('[SplatWindow] Viewer created successfully');
+            if (import.meta.env.DEV) console.log('[SplatWindow] Viewer created successfully');
 
             // Determine scene format (kept for reference, Spark auto-detects)
             let sceneFormat: number | undefined;
@@ -208,57 +213,59 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
             if (needsRotation) {
                 // Rotate 180° around X-axis: quaternion [sin(90°), 0, 0, cos(90°)] = [1, 0, 0, 0]
                 sceneOptions.rotation = [1, 0, 0, 0];
-                console.log('[SplatWindow] Applying rotation for PLY format (quaternion: [1, 0, 0, 0])');
+                if (import.meta.env.DEV) console.log('[SplatWindow] Applying rotation for PLY format (quaternion: [1, 0, 0, 0])');
             }
 
-            console.log('[SplatWindow] Adding splat scene with options:', sceneOptions);
+            if (import.meta.env.DEV) console.log('[SplatWindow] Adding splat scene with options:', sceneOptions);
 
             viewer.addSplatScene(url, sceneOptions)
                 .then(() => {
                     if (!isActive) {
-                        console.log('[SplatWindow] Effect cleaned up, ignoring scene load');
+                        if (import.meta.env.DEV) console.log('[SplatWindow] Effect cleaned up, ignoring scene load');
                         return;
                     }
 
-                    console.log('[SplatWindow] Scene loaded successfully');
+                    if (import.meta.env.DEV) console.log('[SplatWindow] Scene loaded successfully');
 
-                    // Log splat count
+                    // Log splat count (only in dev)
                     const splatCount = viewer.getSplatCount();
-                    console.log('[SplatWindow] Splat count:', splatCount);
+                    if (import.meta.env.DEV) console.log('[SplatWindow] Splat count:', splatCount);
 
                     setLoadProgress(80);
 
                     try {
                         viewer.start();
-                        console.log('[SplatWindow] Viewer started');
+                        if (import.meta.env.DEV) console.log('[SplatWindow] Viewer started');
                     } catch (startErr) {
                         console.error('[SplatWindow] Error starting viewer:', startErr);
                         throw startErr;
                     }
 
-                    // Verify canvas was created and debug container dimensions
-                    setTimeout(() => {
-                        const container = containerRef.current;
-                        const canvas = container?.querySelector('canvas');
-                        console.log('[SplatWindow] Container dimensions:', {
-                            width: container?.clientWidth,
-                            height: container?.clientHeight,
-                            offsetWidth: container?.offsetWidth,
-                            offsetHeight: container?.offsetHeight,
-                        });
-                        if (!canvas) {
-                            console.error('[SplatWindow] Canvas not found after viewer start!');
-                            console.log('[SplatWindow] Container children:', container?.children);
-                        } else {
-                            console.log('[SplatWindow] Canvas verified:', canvas.width, 'x', canvas.height);
-                            console.log('[SplatWindow] Canvas style:', {
-                                position: canvas.style.position,
-                                zIndex: canvas.style.zIndex,
-                                width: canvas.style.width,
-                                height: canvas.style.height,
+                    // Verify canvas was created (only in dev mode)
+                    if (import.meta.env.DEV) {
+                        setTimeout(() => {
+                            const container = containerRef.current;
+                            const canvas = container?.querySelector('canvas');
+                            console.log('[SplatWindow] Container dimensions:', {
+                                width: container?.clientWidth,
+                                height: container?.clientHeight,
+                                offsetWidth: container?.offsetWidth,
+                                offsetHeight: container?.offsetHeight,
                             });
-                        }
-                    }, 100);
+                            if (!canvas) {
+                                console.error('[SplatWindow] Canvas not found after viewer start!');
+                                console.log('[SplatWindow] Container children:', container?.children);
+                            } else {
+                                console.log('[SplatWindow] Canvas verified:', canvas.width, 'x', canvas.height);
+                                console.log('[SplatWindow] Canvas style:', {
+                                    position: canvas.style.position,
+                                    zIndex: canvas.style.zIndex,
+                                    width: canvas.style.width,
+                                    height: canvas.style.height,
+                                });
+                            }
+                        }, 100);
+                    }
 
                     // Auto-fit camera to scene bounds using SplatMesh bounding box
                     setTimeout(() => {
@@ -272,7 +279,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                         const size = box.getSize(new THREE.Vector3());
                         const maxDim = Math.max(size.x, size.y, size.z);
 
-                        console.log('[SplatWindow] Scene bounds:', { center, size, maxDim });
+                        if (import.meta.env.DEV) console.log('[SplatWindow] Scene bounds:', { center, size, maxDim });
 
                         if (maxDim > 0 && isFinite(maxDim)) {
                             const distance = maxDim * 1.5;
@@ -287,7 +294,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                                 viewer.controls.update();
                             }
 
-                            console.log('[SplatWindow] Camera repositioned to:', camera.position, 'looking at:', center);
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera repositioned to:', camera.position, 'looking at:', center);
                         }
 
                         // Configure orbit controls sensitivity (lower = less sensitive)
@@ -295,7 +302,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                             viewer.controls.rotateSpeed = 0.3;
                             viewer.controls.panSpeed = 0.3;
                             viewer.controls.zoomSpeed = 0.5;
-                            console.log('[SplatWindow] Orbit controls sensitivity reduced');
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Orbit controls sensitivity reduced');
                         }
                     }, 200);
 
@@ -309,7 +316,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                     if (!isActive) return;
 
                     if (err.message?.includes('disposed') || err.message?.includes('abort')) {
-                        console.log('[SplatWindow] Scene load aborted (cleanup)');
+                        if (import.meta.env.DEV) console.log('[SplatWindow] Scene load aborted (cleanup)');
                         return;
                     }
 
@@ -329,7 +336,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         }
 
         return () => {
-            console.log('[SplatWindow] Cleanup: disposing viewer');
+            if (import.meta.env.DEV) console.log('[SplatWindow] Cleanup: disposing viewer');
             isActive = false;
 
             if (animationRef.current) {
@@ -348,31 +355,6 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         };
     }, [url, format]);
 
-    // Debug loop (only in development)
-    useEffect(() => {
-        if (import.meta.env.PROD) return; // Skip debug loop in production
-
-        let debugCounter = 0;
-        const interval = setInterval(() => {
-            if (!viewerRef.current) return;
-
-            const viewer = viewerRef.current;
-            const camera = viewer.camera;
-            const count = viewer.getSplatCount();
-
-            debugCounter++;
-            if (debugCounter % 10 === 0) {
-                console.log('[SplatWindow] Debug tick:', {
-                    splatCount: count,
-                    hasCamera: !!camera,
-                    cameraPos: camera ? `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}` : 'N/A'
-                });
-            }
-        }, 500);
-
-        return () => clearInterval(interval);
-    }, []);
-
     // Toggle controls based on mode
     useEffect(() => {
         if (!viewerRef.current || loading) return;
@@ -381,7 +363,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
 
         if (viewer.controls) {
             viewer.controls.enabled = (controlMode === 'orbit');
-            console.log(`[SplatWindow] Controls ${controlMode === 'orbit' ? 'enabled' : 'disabled'} for ${controlMode} mode`);
+            if (import.meta.env.DEV) console.log(`[SplatWindow] Controls ${controlMode === 'orbit' ? 'enabled' : 'disabled'} for ${controlMode} mode`);
 
             // When switching to orbit mode, reset camera to a reasonable position
             if (controlMode === 'orbit' && viewer.camera) {
@@ -391,7 +373,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 viewer.camera.position.set(camX, camY, camZ);
                 viewer.camera.lookAt(params.cameraX, params.cameraY, params.focusDepth);
                 viewer.camera.updateMatrixWorld(true);
-                console.log('[SplatWindow] Reset camera for orbit mode');
+                if (import.meta.env.DEV) console.log('[SplatWindow] Reset camera for orbit mode');
             }
         }
     }, [controlMode, loading, params]);
@@ -409,7 +391,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         // Only run in head tracking mode
         if (controlMode !== 'head') return;
 
-        console.log('[SplatWindow] Starting head tracking camera loop');
+        if (import.meta.env.DEV) console.log('[SplatWindow] Starting head tracking camera loop');
 
         /**
          * Off-Axis Projection Implementation
@@ -441,7 +423,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
             // Get smoothed head position
             const hp = headPosition.current;
 
-            // Extract params
+            // Extract params from ref to avoid stale closure
             const {
                 distance,
                 sensitivity,
@@ -458,7 +440,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 invertX,
                 invertY,
                 invertZ
-            } = params;
+            } = paramsRef.current;
 
             // Calculate eye position in screen-space coordinates
             // Use smoothed values for smooth camera movement
@@ -547,9 +529,10 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 cancelAnimationFrame(animationRef.current);
                 animationRef.current = null;
             }
-            console.log('[SplatWindow] Stopped head tracking camera loop');
+            if (import.meta.env.DEV) console.log('[SplatWindow] Stopped head tracking camera loop');
         };
-    }, [controlMode, loading, headPosition, params]);
+    // Note: params removed from deps - we use paramsRef.current inside RAF for immediate updates
+    }, [controlMode, loading, headPosition]);
 
     return (
         <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>

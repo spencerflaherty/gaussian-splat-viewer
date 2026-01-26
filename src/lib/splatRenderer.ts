@@ -112,7 +112,7 @@ export class SplatViewer {
         this.handleResize = this.handleResize.bind(this);
         window.addEventListener('resize', this.handleResize);
 
-        console.log('[SplatViewer] Viewer created successfully');
+        if (import.meta.env.DEV) console.log('[SplatViewer] Viewer created successfully');
     }
 
     /**
@@ -147,8 +147,10 @@ export class SplatViewer {
             throw new Error('Viewer has been disposed');
         }
 
-        console.log('[SplatViewer] Adding splat scene:', url);
-        console.log('[SplatViewer] Scene options:', options);
+        if (import.meta.env.DEV) {
+            console.log('[SplatViewer] Adding splat scene:', url);
+            console.log('[SplatViewer] Scene options:', options);
+        }
 
         // Remove existing splat mesh if any
         if (this._splatMesh) {
@@ -161,13 +163,13 @@ export class SplatViewer {
         this._splatMesh = new SplatMesh({
             url,
             onLoad: (mesh) => {
-                console.log('[SplatViewer] SplatMesh loaded');
+                if (import.meta.env.DEV) console.log('[SplatViewer] SplatMesh loaded');
 
                 // Apply rotation if specified
                 if (options?.rotation) {
                     const [x, y, z, w] = options.rotation;
                     mesh.quaternion.set(x, y, z, w);
-                    console.log('[SplatViewer] Applied rotation quaternion:', options.rotation);
+                    if (import.meta.env.DEV) console.log('[SplatViewer] Applied rotation quaternion:', options.rotation);
                 }
             },
         });
@@ -177,7 +179,7 @@ export class SplatViewer {
 
         // Wait for initialization
         await this._splatMesh.initialized;
-        console.log('[SplatViewer] Scene loaded successfully');
+        if (import.meta.env.DEV) console.log('[SplatViewer] Scene loaded successfully');
     }
 
     /**
@@ -188,7 +190,7 @@ export class SplatViewer {
             return;
         }
 
-        console.log('[SplatViewer] Starting render loop');
+        if (import.meta.env.DEV) console.log('[SplatViewer] Starting render loop');
         this.isRunning = true;
         this.animate();
     }
@@ -202,7 +204,7 @@ export class SplatViewer {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
-        console.log('[SplatViewer] Stopped render loop');
+        if (import.meta.env.DEV) console.log('[SplatViewer] Stopped render loop');
     }
 
     /**
@@ -213,7 +215,7 @@ export class SplatViewer {
             return;
         }
 
-        console.log('[SplatViewer] Disposing viewer');
+        if (import.meta.env.DEV) console.log('[SplatViewer] Disposing viewer');
         this.disposed = true;
         this.stop();
 
@@ -244,7 +246,7 @@ export class SplatViewer {
             this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
         }
 
-        console.log('[SplatViewer] Viewer disposed');
+        if (import.meta.env.DEV) console.log('[SplatViewer] Viewer disposed');
     }
 
     /**

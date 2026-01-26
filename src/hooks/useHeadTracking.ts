@@ -39,9 +39,9 @@ const FACE_WIDTH_LEFT_LANDMARK = 234;   // Left side of face
 const FACE_WIDTH_RIGHT_LANDMARK = 454;  // Right side of face
 const FACE_WIDTH_SENSITIVITY = 3.0;     // How much face width change maps to Z change
 
-export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAULT_DEAD_ZONE) {
+export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAULT_DEAD_ZONE, enabled = true) {
     const [position, setPosition] = useState<HeadPosition>({ x: 0, y: 0, z: 0 });
-    const [initializing, setInitializing] = useState(true);
+    const [initializing, setInitializing] = useState(enabled);
     const [calibrationProgress, setCalibrationProgress] = useState(0);
     const [isCalibrated, setIsCalibrated] = useState(false);
 
@@ -65,7 +65,7 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
         calibrationFramesRef.current = [];
         setCalibrationProgress(0);
         setIsCalibrated(false);
-        console.log('[HeadTracking] Recalibration started');
+        if (import.meta.env.DEV) console.log('[HeadTracking] Recalibration started');
     }, []);
 
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -104,6 +104,12 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
     }, []);
 
     useEffect(() => {
+        // Don't initialize if not enabled - this enables lazy loading of MediaPipe
+        if (!enabled) {
+            setInitializing(false);
+            return;
+        }
+
         let active = true;
         const video = videoRef.current;
 
@@ -144,7 +150,7 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
                                 const sorted = [...calibrationFramesRef.current].sort((a, b) => a - b);
                                 baselineFaceWidthRef.current = sorted[Math.floor(sorted.length / 2)];
                                 setIsCalibrated(true);
-                                console.log('[HeadTracking] Baseline face width calibrated:', baselineFaceWidthRef.current.toFixed(4));
+                                if (import.meta.env.DEV) console.log('[HeadTracking] Baseline face width calibrated:', baselineFaceWidthRef.current.toFixed(4));
                             }
                         }
 
@@ -224,7 +230,7 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
                         videoRef.current.srcObject = stream;
                         videoRef.current.play()
                             .then(() => {
-                                console.log('[HeadTracking] Video playback started');
+                                if (import.meta.env.DEV) console.log('[HeadTracking] Video playback started');
                             })
                             .catch((e) => {
                                 console.error('[HeadTracking] Video play failed:', e);
@@ -284,7 +290,7 @@ export function useHeadTracking(smoothing = DEFAULT_SMOOTHING, deadZone = DEFAUL
                 stream.getTracks().forEach(track => track.stop());
             }
         };
-    }, [lerp, length, landmarkDistance]);
+    }, [lerp, length, landmarkDistance, enabled]);
 
     return {
         position,                    // Smoothed position for React state/UI

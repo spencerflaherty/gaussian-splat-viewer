@@ -44,13 +44,14 @@ function App() {
   } = useViewerStore();
 
   // Head tracking with params from settings store
+  // Only enable when in head tracking mode to lazy-load MediaPipe
   const {
     positionRef,
     videoRef,
     calibrationProgress,
     isCalibrated,
     recalibrate,
-  } = useHeadTracking(params.smoothing, params.deadZone);
+  } = useHeadTracking(params.smoothing, params.deadZone, controlMode === 'head');
 
   const hideControlsTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
