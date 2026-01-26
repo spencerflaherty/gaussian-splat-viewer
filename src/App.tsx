@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useHeadTracking } from './hooks/useHeadTracking';
 import { SplatWindow, DEFAULT_HEAD_TRACKING_PARAMS } from './components/SplatWindow';
+import { LiquidGlass } from './components/ui/LiquidGlass';
+import { Slider } from './components/ui/Slider';
 import type { HeadTrackingParams } from './components/SplatWindow';
 
 type ProcessingStage = 'idle' | 'uploading' | 'converting' | 'loading';
@@ -17,32 +19,23 @@ const STAGE_INFO: Record<ProcessingStage, { label: string; progress: number }> =
 const BACKEND_URL = 'http://127.0.0.1:8000';
 const STORAGE_KEY = 'splatWindowSettings_v7';
 
-const SLIDER_CONFIG: Record<string, { range: number; step: number; label: string }> = {
-  sensitivity: { range: 2.0, step: 0.01, label: 'Sensitivity' },
-  distance: { range: 10, step: 0.01, label: 'Distance' },
-  screenSize: { range: 20, step: 0.01, label: 'Screen Size' },
-  verticalOffset: { range: 1.0, step: 0.01, label: 'Vertical Offset' },
-  depthSensitivity: { range: 2.0, step: 0.01, label: 'Depth Sensitivity' },
-  cameraX: { range: 20, step: 0.01, label: 'Camera X' },
-  cameraY: { range: 20, step: 0.01, label: 'Camera Y' },
-  cameraZ: { range: 20, step: 0.01, label: 'Camera Z' },
-  focusDepth: { range: 50, step: 0.01, label: 'Focus Depth' },
-  smoothing: { range: 0.5, step: 0.01, label: 'Smoothing' },
-  deadZone: { range: 0.1, step: 0.001, label: 'Dead Zone' },
+// Slider configuration with actual min/max values
+const SLIDER_CONFIG: Record<string, { min: number; max: number; step: number; label: string }> = {
+  sensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Sensitivity' },
+  distance: { min: 0.5, max: 20, step: 0.1, label: 'Distance' },
+  screenSize: { min: 0.1, max: 5, step: 0.01, label: 'Screen Size' },
+  verticalOffset: { min: -1.0, max: 2.0, step: 0.01, label: 'Vertical Offset' },
+  depthSensitivity: { min: 0, max: 2.0, step: 0.01, label: 'Depth Sensitivity' },
+  cameraX: { min: -20, max: 20, step: 0.1, label: 'Camera X' },
+  cameraY: { min: -20, max: 20, step: 0.1, label: 'Camera Y' },
+  cameraZ: { min: -20, max: 20, step: 0.1, label: 'Camera Z' },
+  focusDepth: { min: -50, max: 50, step: 0.1, label: 'Focus Depth' },
+  smoothing: { min: 0.01, max: 0.5, step: 0.01, label: 'Smoothing' },
+  deadZone: { min: 0, max: 0.1, step: 0.001, label: 'Dead Zone' },
 };
 
 // Only use these for numeric params
 type NumericParams = Exclude<keyof HeadTrackingParams, 'enableX' | 'enableY' | 'enableZ' | 'invertX' | 'invertY' | 'invertZ'>;
-
-const toSliderValue = (param: NumericParams, actualValue: number): number => {
-  const defaultVal = DEFAULT_HEAD_TRACKING_PARAMS[param] as number;
-  return Math.round((actualValue - defaultVal) * 1000) / 1000;
-};
-
-const fromSliderValue = (param: NumericParams, sliderValue: number): number => {
-  const defaultVal = DEFAULT_HEAD_TRACKING_PARAMS[param] as number;
-  return Math.round((defaultVal + sliderValue) * 1000) / 1000;
-};
 
 function loadSavedSettings(): HeadTrackingParams {
   try {
@@ -62,37 +55,6 @@ function saveSettings(params: HeadTrackingParams): void {
   } catch (e) {
     console.error('[App] Failed to save settings:', e);
   }
-}
-
-// Liquid Glass Panel - Apple iOS 26 style
-function LiquidGlass({ children, className = '', style = {}, variant = 'default' }: {
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-  variant?: 'default' | 'pill' | 'sidebar';
-}) {
-  const baseStyles: React.CSSProperties = {
-    background: variant === 'sidebar'
-      ? 'rgba(255, 255, 255, 0.72)'
-      : 'rgba(255, 255, 255, 0.65)',
-    backdropFilter: 'blur(50px) saturate(190%)',
-    WebkitBackdropFilter: 'blur(50px) saturate(190%)',
-    border: '0.5px solid rgba(255, 255, 255, 0.5)',
-    boxShadow: `
-      0 2px 20px rgba(0, 0, 0, 0.08),
-      0 8px 40px rgba(0, 0, 0, 0.04),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.2)
-    `,
-    borderRadius: variant === 'pill' ? 50 : 20,
-    ...style,
-  };
-
-  return (
-    <div className={className} style={baseStyles}>
-      {children}
-    </div>
-  );
 }
 
 // HUD Overlay
@@ -127,65 +89,23 @@ function HUDOverlay({
   darkBackground: boolean;
   setDarkBackground: (dark: boolean) => void;
 }) {
+  // Helper function to render a slider for a parameter
   const renderSlider = (param: NumericParams) => {
     const config = SLIDER_CONFIG[param];
     if (!config) return null;
 
-    const actualValue = headTrackingParams[param] as number;
-    const sliderValue = toSliderValue(param, actualValue);
-
-    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = parseFloat(e.target.value);
-      if (!isNaN(val)) {
-        const clamped = Math.max(-config.range, Math.min(config.range, val));
-        setHeadTrackingParams(p => ({ ...p, [param]: fromSliderValue(param, clamped) }));
-      }
-    };
+    const value = headTrackingParams[param] as number;
 
     return (
-      <div key={param} style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, color: 'rgba(0, 0, 0, 0.85)', fontWeight: 500 }}>
-            {config.label}
-          </span>
-          <input
-            type="number"
-            step={config.step}
-            value={sliderValue.toFixed(2)}
-            onChange={handleTextChange}
-            style={{
-              width: 70,
-              padding: '4px 8px',
-              fontSize: 12,
-              fontFamily: 'SF Mono, monospace',
-              color: 'rgba(0, 0, 0, 0.7)',
-              background: 'rgba(0, 0, 0, 0.04)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: 6,
-              textAlign: 'right',
-              outline: 'none',
-            }}
-          />
-        </div>
-        <input
-          type="range"
-          min={-config.range}
-          max={config.range}
-          step={config.step}
-          value={sliderValue}
-          onChange={(e) => setHeadTrackingParams(p => ({ ...p, [param]: fromSliderValue(param, Number(e.target.value)) }))}
-          style={{
-            width: '100%',
-            height: 4,
-            borderRadius: 2,
-            background: `linear-gradient(to right,
-              #007AFF ${((sliderValue + config.range) / (config.range * 2)) * 100}%,
-              rgba(0,0,0,0.1) ${((sliderValue + config.range) / (config.range * 2)) * 100}%)`,
-            WebkitAppearance: 'none',
-            cursor: 'pointer',
-          }}
-        />
-      </div>
+      <Slider
+        key={param}
+        label={config.label}
+        value={value}
+        min={config.min}
+        max={config.max}
+        step={config.step}
+        onChange={(newValue) => setHeadTrackingParams(p => ({ ...p, [param]: newValue }))}
+      />
     );
   };
 
