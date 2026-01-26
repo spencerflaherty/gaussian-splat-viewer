@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import subprocess
@@ -8,6 +8,7 @@ import sys
 import struct
 import numpy as np
 from pathlib import Path
+import asyncio
 
 app = FastAPI()
 
@@ -24,6 +25,76 @@ UPLOAD_DIR = Path("temp_uploads")
 OUTPUT_DIR = Path("temp_outputs")
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+# Cleanup settings
+CLEANUP_AFTER_SECONDS = 3600  # 1 hour
+CLEANUP_INTERVAL_SECONDS = 600  # Run cleanup every 10 minutes
+
+
+def cleanup_job_directory(job_id: str):
+    """
+    Clean up job directories after a short delay (for FileResponse to complete).
+    """
+    # Wait a bit for the file to be fully sent
+    time.sleep(2)
+
+    input_dir = UPLOAD_DIR / job_id
+    output_dir = OUTPUT_DIR / job_id
+
+    for directory in [input_dir, output_dir]:
+        if directory.exists():
+            try:
+                shutil.rmtree(directory)
+                print(f"[cleanup] Removed job directory: {directory}")
+            except Exception as e:
+                print(f"[cleanup] Failed to remove {directory}: {e}")
+
+
+def cleanup_old_files():
+    """
+    Remove files older than CLEANUP_AFTER_SECONDS from temp directories.
+    """
+    current_time = time.time()
+    cleaned_count = 0
+
+    for temp_dir in [UPLOAD_DIR, OUTPUT_DIR]:
+        if not temp_dir.exists():
+            continue
+
+        for item in temp_dir.iterdir():
+            if item.is_dir():
+                # Check modification time of directory
+                mtime = item.stat().st_mtime
+                age_seconds = current_time - mtime
+
+                if age_seconds > CLEANUP_AFTER_SECONDS:
+                    try:
+                        shutil.rmtree(item)
+                        cleaned_count += 1
+                        print(f"[cleanup] Removed old directory: {item} (age: {age_seconds/60:.1f} min)")
+                    except Exception as e:
+                        print(f"[cleanup] Failed to remove {item}: {e}")
+
+    if cleaned_count > 0:
+        print(f"[cleanup] Cleaned up {cleaned_count} old directories")
+
+    return cleaned_count
+
+
+async def periodic_cleanup():
+    """Background task that periodically cleans up old files."""
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+        cleanup_old_files()
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Clean up any leftover files from previous runs and start periodic cleanup."""
+    cleaned = cleanup_old_files()
+    print(f"[startup] Initial cleanup: removed {cleaned} old directories")
+    # Start periodic cleanup task
+    asyncio.create_task(periodic_cleanup())
 
 
 @app.get("/")
@@ -259,7 +330,8 @@ def downsample_ply(input_path: Path, output_path: Path, keep_percentage: int):
 @app.post("/convert")
 async def convert_image(
     file: UploadFile = File(...),
-    quality: int = Form(default=100)
+    quality: int = Form(default=100),
+    background_tasks: BackgroundTasks = None
 ):
     """
     Accepts an image file, runs SHARP to convert it to a gaussian splat PLY.
@@ -338,12 +410,26 @@ async def convert_image(
         else:
             output_file = cleaned_ply
 
+        # Schedule cleanup of job directories after response is sent
+        if background_tasks:
+            background_tasks.add_task(cleanup_job_directory, job_id)
+
         return FileResponse(output_file, filename=f"splat_{job_id}.ply", media_type="application/octet-stream")
 
     except Exception as e:
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+
+        # Clean up on error
+        for directory in [job_input_dir, job_output_dir]:
+            if directory.exists():
+                try:
+                    shutil.rmtree(directory)
+                    print(f"[cleanup] Removed failed job directory: {directory}")
+                except Exception as cleanup_error:
+                    print(f"[cleanup] Failed to clean up {directory}: {cleanup_error}")
+
         raise HTTPException(status_code=500, detail=str(e))
 
 

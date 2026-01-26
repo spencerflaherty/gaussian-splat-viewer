@@ -255,11 +255,11 @@ Work through EXECUTION_PLAN.md systematically. Complete each task, validate it w
 ## Phase 5: Backend Improvements
 
 ### Task 5.1: Add Temp File Cleanup
-- [ ] Add cleanup after FileResponse sent
-- [ ] Or add background task to delete files older than 1 hour
-- [ ] Test that temp directories don't grow
+- [x] Add cleanup after FileResponse sent (BackgroundTasks)
+- [x] Or add background task to delete files older than 1 hour (periodic_cleanup)
+- [x] Test that temp directories don't grow
 
-**Validation:** temp_uploads and temp_outputs stay clean
+**Validation:** temp_uploads and temp_outputs stay clean ✅
 
 ### Task 5.2: Implement SSE Streaming Endpoint
 - [ ] Create `/convert-stream` endpoint
