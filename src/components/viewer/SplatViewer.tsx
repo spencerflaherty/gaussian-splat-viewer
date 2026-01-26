@@ -306,32 +306,59 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                         if (import.meta.env.DEV) console.log('[SplatWindow] Scene bounds:', { center: center.toArray(), size: size.toArray(), maxDim });
 
                         // For SHARP PLY files, recreate the original image perspective
-                        // The original camera was looking "into" the scene from a distance
-                        // After 180° X rotation, we position in front of scene looking at center
+                        // SHARP reconstructs scenes from a single image, with the original
+                        // camera looking "into" the scene (typically negative Z in OpenCV coords)
+                        // After 180° X rotation, the scene is flipped so we look from positive Z
                         if (format === 'ply' && maxDim > 0 && isFinite(maxDim)) {
-                            // Calculate viewing distance - close enough to fill the frame
-                            // like the original image but with some margin
-                            const viewDistance = maxDim * 0.7;
+                            // The bounding box can be skewed by outliers (sky/ground splats)
+                            // For the target point, use center of XY but a more sensible Z
+                            // that's closer to the "front" of the scene
 
-                            // Position camera in front of the scene (positive Z from center)
-                            // looking at the scene center to recreate original perspective
-                            camera.position.set(center.x, center.y, center.z + viewDistance);
-                            camera.lookAt(center);
+                            // Log raw bounds for debugging
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Raw bounding box:', {
+                                min: box.min.toArray(),
+                                max: box.max.toArray(),
+                                center: center.toArray(),
+                                size: size.toArray()
+                            });
+
+                            // Use the front 75% of Z range as focal point (ignores far background)
+                            const focalZ = box.max.z - (size.z * 0.25);
+                            const focalPoint = new THREE.Vector3(center.x, center.y, focalZ);
+
+                            // Calculate viewing distance to fill frame
+                            // Based on XY extent (more reliable than Z which can have outliers)
+                            const maxXY = Math.max(size.x, size.y);
+
+                            // Distance formula: for ~50° FOV, distance ≈ extent / 2 / tan(25°)
+                            // tan(25°) ≈ 0.47, so distance ≈ extent * 1.07
+                            // Use 0.9 to be a bit closer for that "original photo" framing
+                            const viewDistance = maxXY * 0.9;
+
+                            // Camera position: in front of focal point (higher Z than focal)
+                            const camZ = focalZ + viewDistance;
+
+                            camera.position.set(center.x, center.y, camZ);
+                            camera.lookAt(focalPoint);
                             camera.updateMatrixWorld(true);
 
-                            // Set orbit target to scene center
+                            // Set orbit target
                             if (viewer.controls?.target) {
-                                viewer.controls.target.copy(center);
+                                viewer.controls.target.copy(focalPoint);
                                 viewer.controls.update();
                             }
 
                             // Store as home position
                             homeCameraRef.current = {
                                 position: camera.position.clone(),
-                                target: center.clone(),
+                                target: focalPoint.clone(),
                             };
 
-                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera positioned for PLY (original perspective), dist:', viewDistance);
+                            if (import.meta.env.DEV) console.log('[SplatWindow] Camera positioned for PLY:', {
+                                cameraPos: camera.position.toArray(),
+                                focalPoint: focalPoint.toArray(),
+                                viewDistance
+                            });
                         } else if (maxDim > 0 && isFinite(maxDim)) {
                             // For .splat files, use bounding box center
                             const distance = maxDim * 1.5;

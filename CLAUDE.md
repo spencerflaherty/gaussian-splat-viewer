@@ -710,27 +710,50 @@ self.crossOriginIsolated
 ## Future Features / Roadmap
 
 ### Implemented (January 2025)
-- **SSE Streaming Progress**: Real-time conversion progress with cancel support ✅
-- **Vercel Deployment Ready**: vercel.json config, COOP/COEP headers, install.sh ✅
-- **Mobile Input Sources**: Gyroscope and touch drag input abstraction ✅
-- **Animation Infrastructure**: Keyframe capture, interpolation, easing functions ✅
-- **State Management**: Zustand stores for settings, viewer, and animation ✅
-- **Calibration Wizard**: Visual feedback during head tracking calibration ✅
-- **Settings Presets**: Subtle, Natural, Dramatic one-click presets ✅
-- **Camera Position Debug Box**: Real-time display of camera X/Y/Z coordinates and target point ✅
-- **Slider Ranges Centered**: All sliders have ranges where defaults sit at ~50% for intuitive adjustment ✅
-- **Install Script Auto-Run**: `curl | bash` installer now auto-starts the app ✅
+
+**Major Refactor Completed:**
+- Migrated from `gaussian-splats-3d` to `@sparkjsdev/spark` renderer
+- Refactored App.tsx from ~1000 lines to ~290 lines via component extraction
+- Added Zustand state management (settings, viewer, animation stores)
+- Fixed depth (Z) tracking using face-width measurement instead of unreliable MediaPipe Z
+
+**Features:**
+- **SSE Streaming Progress**: Real-time conversion progress with cancel support
+- **Vercel Deployment Ready**: vercel.json config, COOP/COEP headers, install.sh
+- **Mobile Input Sources**: Gyroscope and touch drag input abstraction (infrastructure ready)
+- **Animation Infrastructure**: Keyframe capture, interpolation, easing functions
+- **Calibration Wizard**: Visual feedback during head tracking calibration
+- **Settings Presets**: Subtle, Natural, Dramatic one-click presets
+- **Camera Position Debug Box**: Real-time display of camera X/Y/Z coordinates
+- **Slider UX Improvements**: All sliders show real values with defaults at ~50% of range, direct text input supported
+- **Backend Job Management**: Cancel running jobs, status polling, result downloads
+- **Temp File Cleanup**: Automatic cleanup of old uploads/outputs
 
 ### Planned Features
-- **Animation Export (MP4)**: ffmpeg.wasm integration for video export
-- **Preview Loop**: Animation preview playback in viewer
-- **Cubic Bezier Editor**: Visual easing curve editor
-- **Video Support**: Upload video -> extract frames -> generate 3D splat
-- **Multi-View**: Construct splats from multiple images or video frames
 
-### Deferred
-- **CSS Class Consolidation**: 101 inline styles work well, low ROI to migrate
-- **Adaptive Quality**: Frame rate monitoring with auto quality adjustment
+**Animation Export (MP4)** - Infrastructure ready, ffmpeg.wasm pending
+- Keyframe capture UI exists (`KeyframeCapture.tsx`)
+- Interpolation functions implemented (Vector3.lerpVectors, Quaternion.slerpQuaternions)
+- Easing functions ready (linear, easeIn, easeOut, easeInOut, custom cubic bezier)
+- Remaining: ffmpeg.wasm integration, preview loop, export progress UI
+
+**Mobile Browser Support** - Infrastructure ready, UI integration pending
+- Mobile detection hook exists (`useMobileDetection.ts`)
+- Gyroscope input class exists (`GyroscopeInput.ts`)
+- Touch input class exists (`TouchInput.ts`)
+- ParallaxInput interface defined (`inputSources.ts`)
+- Remaining: Integration into SplatViewer, mobile control mode UI
+
+**Other Ideas:**
+- **Video Support**: Upload video -> extract frames -> generate 3D splat
+- **Multi-View Reconstruction**: Construct splats from multiple images
+- **Offline PWA**: Service worker for viewing pre-loaded splats offline
+- **Cubic Bezier Editor**: Visual easing curve editor with draggable control points
+
+### Deferred (Low Priority)
+
+- **CSS Class Consolidation**: 101 inline styles work well, low ROI to migrate to CSS classes
+- **Adaptive Quality**: Frame rate monitoring with automatic quality adjustment
 
 ---
 
@@ -816,8 +839,6 @@ npm run test
 ├── package.json                    # NPM config with scripts
 ├── vite.config.ts                  # Vite configuration
 ├── tsconfig.json                   # TypeScript configuration
-├── CLAUDE.md                       # This file
-├── PRD.md                          # Product Requirements Document
-├── EXECUTION_PLAN.md               # Refactor execution plan
-└── feature_improvements.md         # Feature roadmap
+├── CLAUDE.md                       # This file (project documentation)
+└── PRD.md                          # Product Requirements Document
 ```
