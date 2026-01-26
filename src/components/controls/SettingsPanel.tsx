@@ -2,6 +2,7 @@ import { LiquidGlass } from '../ui/LiquidGlass';
 import { Slider } from '../ui/Slider';
 import { useSettingsStore } from '../../stores';
 import type { HeadTrackingParams } from '../viewer/SplatViewer';
+import type { RendererSettings } from '../../lib/splatRenderer';
 
 // Slider configuration with actual min/max values and optional semantic labels
 // Ranges are designed so calibrated defaults sit at sensible midpoints
@@ -39,12 +40,39 @@ const SLIDER_CONFIG: Record<string, {
 // Only use these for numeric params
 type NumericParams = Exclude<keyof HeadTrackingParams, 'enableX' | 'enableY' | 'enableZ' | 'invertX' | 'invertY' | 'invertZ'>;
 
+// Renderer settings slider configuration
+// These affect how splats are rendered (depth perception, size, quality)
+const RENDERER_SLIDER_CONFIG: Record<string, {
+  min: number;
+  max: number;
+  step: number;
+  label: string;
+  minLabel?: string;
+  maxLabel?: string;
+  defaultValue?: number;
+}> = {
+  // Focal adjustment - affects perceived depth/size of splats
+  // 1.0 = Spark default, 2.0 = match PlayCanvas renderer
+  focalAdjustment: { min: 0.5, max: 3.0, step: 0.1, label: 'Focal Adjustment', minLabel: 'Compressed', maxLabel: 'Stretched', defaultValue: 1.0 },
+  // Max standard deviation - controls maximum splat size
+  // √8 ≈ 2.83 is Spark default
+  maxStdDev: { min: 1.0, max: 5.0, step: 0.1, label: 'Splat Size (Max)', minLabel: 'Small', maxLabel: 'Large', defaultValue: Math.sqrt(8) },
+  // Blur amount - anti-aliasing for smoother edges
+  // 0 = sharp, 0.3 = typical AA, higher = softer
+  blurAmount: { min: 0, max: 1.0, step: 0.05, label: 'Edge Blur', minLabel: 'Sharp', maxLabel: 'Soft', defaultValue: 0 },
+  // Falloff - splat shape from flat to gaussian
+  // 0 = flat disc, 1 = normal gaussian kernel
+  falloff: { min: 0, max: 1.0, step: 0.1, label: 'Splat Falloff', minLabel: 'Flat', maxLabel: 'Gaussian', defaultValue: 1.0 },
+};
+
 export interface SettingsPanelProps {
   visible: boolean;
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
   /** Whether to highlight the panel to draw attention (for first-time users) */
   highlight?: boolean;
+  /** Current control mode - hides head tracking settings in orbit mode */
+  controlMode?: 'head' | 'orbit';
 }
 
 /**
@@ -58,12 +86,19 @@ export function SettingsPanel({
   showSettings,
   setShowSettings,
   highlight = false,
+  controlMode = 'head',
 }: SettingsPanelProps) {
+  const isHeadTrackingMode = controlMode === 'head';
   // Get settings from store
   const params = useSettingsStore((s) => s.params);
   const updateParam = useSettingsStore((s) => s.updateParam);
   const applyPreset = useSettingsStore((s) => s.applyPreset);
   const reset = useSettingsStore((s) => s.reset);
+
+  // Renderer settings from store
+  const rendererSettings = useSettingsStore((s) => s.rendererSettings);
+  const updateRendererSetting = useSettingsStore((s) => s.updateRendererSetting);
+  const resetRenderer = useSettingsStore((s) => s.resetRenderer);
 
   // Helper function to render a slider for a parameter
   const renderSlider = (param: NumericParams) => {
@@ -81,6 +116,28 @@ export function SettingsPanel({
         max={config.max}
         step={config.step}
         onChange={(newValue) => updateParam(param, newValue)}
+        minLabel={config.minLabel}
+        maxLabel={config.maxLabel}
+      />
+    );
+  };
+
+  // Helper function to render a slider for renderer settings
+  const renderRendererSlider = (param: keyof RendererSettings) => {
+    const config = RENDERER_SLIDER_CONFIG[param];
+    if (!config) return null;
+
+    const value = rendererSettings[param] as number;
+
+    return (
+      <Slider
+        key={param}
+        label={config.label}
+        value={value}
+        min={config.min}
+        max={config.max}
+        step={config.step}
+        onChange={(newValue) => updateRendererSetting(param, newValue)}
         minLabel={config.minLabel}
         maxLabel={config.maxLabel}
       />
@@ -151,147 +208,187 @@ export function SettingsPanel({
             className="settings-scroll"
             style={{ padding: 16, overflowY: 'auto', flex: 1, maxHeight: 'calc(100vh - 250px)' }}
           >
-            {/* Presets */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                Presets
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['subtle', 'natural', 'dramatic'] as const).map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => applyPreset(preset)}
-                    style={{
-                      flex: 1,
-                      padding: '10px 8px',
-                      borderRadius: 10,
-                      border: 'none',
-                      background: 'rgba(0, 122, 255, 0.1)',
-                      color: '#007AFF',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      textTransform: 'capitalize',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Axis Toggles */}
-            <div style={{ marginBottom: 20, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16 }}>
-              <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                Tracking Axes
-              </div>
-              {/* Enable/Disable Row */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                {(['enableX', 'enableY', 'enableZ'] as const).map((axis) => {
-                  const labels = { enableX: 'X', enableY: 'Y', enableZ: 'Z' };
-                  const descriptions = { enableX: 'Left/Right', enableY: 'Up/Down', enableZ: 'Depth' };
-                  const isEnabled = params[axis];
-                  return (
+            {/* Presets - Only show in head tracking mode */}
+            {isHeadTrackingMode && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
+                  Presets
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['subtle', 'natural', 'dramatic'] as const).map((preset) => (
                     <button
-                      key={axis}
-                      onClick={() => updateParam(axis, !params[axis])}
+                      key={preset}
+                      onClick={() => applyPreset(preset)}
                       style={{
                         flex: 1,
                         padding: '10px 8px',
                         borderRadius: 10,
                         border: 'none',
-                        background: isEnabled ? 'rgba(0, 122, 255, 0.9)' : 'rgba(0, 0, 0, 0.06)',
-                        color: isEnabled ? 'white' : 'rgba(0, 0, 0, 0.5)',
+                        background: 'rgba(0, 122, 255, 0.1)',
+                        color: '#007AFF',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <div style={{ fontSize: 16, fontWeight: 700 }}>{labels[axis]}</div>
-                      <div style={{ fontSize: 10, opacity: 0.8 }}>{descriptions[axis]}</div>
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Flip/Invert Row */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['invertX', 'invertY', 'invertZ'] as const).map((axis) => {
-                  const labels = { invertX: 'Flip X', invertY: 'Flip Y', invertZ: 'Flip Z' };
-                  const isInverted = params[axis];
-                  return (
-                    <button
-                      key={axis}
-                      onClick={() => updateParam(axis, !params[axis])}
-                      style={{
-                        flex: 1,
-                        padding: '8px 6px',
-                        borderRadius: 8,
-                        border: 'none',
-                        background: isInverted ? 'rgba(255, 149, 0, 0.9)' : 'rgba(0, 0, 0, 0.04)',
-                        color: isInverted ? 'white' : 'rgba(0, 0, 0, 0.4)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: 600,
+                        textTransform: 'capitalize',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      {isInverted ? '↔ ' : ''}{labels[axis]}
+                      {preset}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Motion Section */}
+            {/* Head Tracking Settings - Only show in head tracking mode */}
+            {isHeadTrackingMode && (
+              <>
+                {/* Axis Toggles */}
+                <div style={{ marginBottom: 20, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16 }}>
+                  <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
+                    Tracking Axes
+                  </div>
+                  {/* Enable/Disable Row */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    {(['enableX', 'enableY', 'enableZ'] as const).map((axis) => {
+                      const labels = { enableX: 'X', enableY: 'Y', enableZ: 'Z' };
+                      const descriptions = { enableX: 'Left/Right', enableY: 'Up/Down', enableZ: 'Depth' };
+                      const isEnabled = params[axis];
+                      return (
+                        <button
+                          key={axis}
+                          onClick={() => updateParam(axis, !params[axis])}
+                          style={{
+                            flex: 1,
+                            padding: '10px 8px',
+                            borderRadius: 10,
+                            border: 'none',
+                            background: isEnabled ? 'rgba(0, 122, 255, 0.9)' : 'rgba(0, 0, 0, 0.06)',
+                            color: isEnabled ? 'white' : 'rgba(0, 0, 0, 0.5)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          <div style={{ fontSize: 16, fontWeight: 700 }}>{labels[axis]}</div>
+                          <div style={{ fontSize: 10, opacity: 0.8 }}>{descriptions[axis]}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Flip/Invert Row */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(['invertX', 'invertY', 'invertZ'] as const).map((axis) => {
+                      const labels = { invertX: 'Flip X', invertY: 'Flip Y', invertZ: 'Flip Z' };
+                      const isInverted = params[axis];
+                      return (
+                        <button
+                          key={axis}
+                          onClick={() => updateParam(axis, !params[axis])}
+                          style={{
+                            flex: 1,
+                            padding: '8px 6px',
+                            borderRadius: 8,
+                            border: 'none',
+                            background: isInverted ? 'rgba(255, 149, 0, 0.9)' : 'rgba(0, 0, 0, 0.04)',
+                            color: isInverted ? 'white' : 'rgba(0, 0, 0, 0.4)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {isInverted ? '↔ ' : ''}{labels[axis]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Motion Section */}
+                <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
+                    Motion
+                  </div>
+                  {renderSlider('sensitivity' as NumericParams)}
+                  {renderSlider('depthSensitivity' as NumericParams)}
+                </div>
+
+                {/* Offset Section */}
+                <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
+                    Offset Adjustments
+                  </div>
+                  <p style={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.4)', marginBottom: 10 }}>
+                    Fine-tune the camera position relative to your head
+                  </p>
+                  {renderSlider('cameraX' as NumericParams)}
+                  {renderSlider('cameraY' as NumericParams)}
+                  {renderSlider('cameraZ' as NumericParams)}
+                </div>
+
+                {/* Smoothing Section */}
+                <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
+                    Smoothing
+                  </div>
+                  {renderSlider('smoothing' as NumericParams)}
+                  {renderSlider('deadZone' as NumericParams)}
+                </div>
+              </>
+            )}
+
+            {/* Renderer Settings Section */}
             <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                Motion
-              </div>
-              {renderSlider('sensitivity' as NumericParams)}
-              {renderSlider('depthSensitivity' as NumericParams)}
-            </div>
-
-            {/* Offset Section */}
-            <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                Offset Adjustments
+                Rendering
               </div>
               <p style={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.4)', marginBottom: 10 }}>
-                Fine-tune the camera position relative to your head
+                Adjust splat appearance and depth perception
               </p>
-              {renderSlider('cameraX' as NumericParams)}
-              {renderSlider('cameraY' as NumericParams)}
-              {renderSlider('cameraZ' as NumericParams)}
-            </div>
-
-            {/* Smoothing Section */}
-            <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                Smoothing
-              </div>
-              {renderSlider('smoothing' as NumericParams)}
-              {renderSlider('deadZone' as NumericParams)}
-            </div>
-
-            {/* Reset Button */}
-            <div style={{ paddingTop: 8, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)' }}>
+              {renderRendererSlider('focalAdjustment')}
+              {renderRendererSlider('maxStdDev')}
+              {renderRendererSlider('blurAmount')}
+              {renderRendererSlider('falloff')}
               <button
-                onClick={reset}
+                onClick={resetRenderer}
                 style={{
                   width: '100%',
-                  padding: 12,
-                  borderRadius: 10,
+                  padding: 8,
+                  marginTop: 8,
+                  borderRadius: 8,
                   border: 'none',
-                  background: 'rgba(0, 0, 0, 0.06)',
-                  color: 'rgba(0, 0, 0, 0.6)',
-                  fontSize: 14,
+                  background: 'rgba(0, 0, 0, 0.04)',
+                  color: 'rgba(0, 0, 0, 0.5)',
+                  fontSize: 12,
                   fontWeight: 500,
                   cursor: 'pointer',
                 }}
               >
-                Reset to Defaults
+                Reset Rendering
               </button>
             </div>
+
+            {/* Reset Button - Only show in head tracking mode */}
+            {isHeadTrackingMode && (
+              <div style={{ paddingTop: 8, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)' }}>
+                <button
+                  onClick={reset}
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'rgba(0, 0, 0, 0.06)',
+                    color: 'rgba(0, 0, 0, 0.6)',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reset Head Tracking
+                </button>
+              </div>
+            )}
           </div>
         )}
       </LiquidGlass>

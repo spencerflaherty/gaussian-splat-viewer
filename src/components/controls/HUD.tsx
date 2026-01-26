@@ -227,15 +227,14 @@ export function HUDOverlay({
         </LiquidGlass>
       </div>
 
-      {/* Settings Panel */}
-      {controlMode === 'head' && (
-        <SettingsPanel
-          visible={showControls}
-          showSettings={showSettings}
-          setShowSettings={setShowSettings}
-          highlight={highlightSettings}
-        />
-      )}
+      {/* Settings Panel - Always visible, contains both head tracking and renderer settings */}
+      <SettingsPanel
+        visible={showControls}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
+        highlight={highlightSettings}
+        controlMode={controlMode}
+      />
 
       {/* Calibration Wizard */}
       {controlMode === 'head' && (

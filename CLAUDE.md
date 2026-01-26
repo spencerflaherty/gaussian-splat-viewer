@@ -9,12 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. [Design System (Liquid Glass)](#design-system-liquid-glass)
 5. [Core Components](#core-components)
 6. [Head Tracking & Parallax Effect](#head-tracking--parallax-effect)
-7. [Python Backend (SHARP)](#python-backend-apple-sharp)
-8. [Deployment Guide](#deployment-guide)
-9. [Known Bugs & Issues](#known-bugs--issues)
-10. [Troubleshooting Guide](#troubleshooting-guide)
-11. [Future Features / Roadmap](#future-features--roadmap)
-12. [Testing](#testing)
+7. [Renderer Settings (Spark)](#renderer-settings-spark)
+8. [Python Backend (SHARP)](#python-backend-apple-sharp)
+9. [Deployment Guide](#deployment-guide)
+10. [Known Bugs & Issues](#known-bugs--issues)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Future Features / Roadmap](#future-features--roadmap)
+13. [Testing](#testing)
 
 ---
 
@@ -426,6 +427,69 @@ MediaPipe's native Z-coordinate is unreliable for depth estimation—it represen
 - **X**: -1 (left) to 1 (right) from viewer's perspective
 - **Y**: -1 (down) to 1 (up)
 - **Z**: positive = closer to webcam (based on face width measurement)
+
+---
+
+## Renderer Settings (Spark)
+
+The Spark renderer (from `@sparkjsdev/spark`) has configurable settings that affect how splats are rendered, including depth perception and visual quality. These settings are accessible in **both** Orbit and Head Tracking modes via the Settings panel.
+
+### Renderer Parameters
+
+| Parameter | Default | Range | Description |
+|-----------|---------|-------|-------------|
+| `focalAdjustment` | **1.0** | 0.5 - 3.0 | Affects depth perception. Lower = compressed depth, Higher = stretched. Use 2.0 to match PlayCanvas renderer |
+| `maxStdDev` | **2.83** (√8) | 1.0 - 5.0 | Maximum splat render size. Larger = more coverage/softer, Smaller = sharper details |
+| `blurAmount` | **0** | 0 - 1.0 | Edge anti-aliasing. 0 = sharp edges, 0.3 = typical smooth AA |
+| `falloff` | **1.0** | 0 - 1.0 | Splat shape. 0 = flat discs, 1 = gaussian kernels (natural falloff) |
+
+### Fixing Depth Stretching
+
+If splats appear stretched in depth:
+1. **Reduce `focalAdjustment`** (try 0.7-0.9) to compress perceived depth
+2. **Reduce `maxStdDev`** (try 2.0-2.5) to make splats smaller and sharper
+
+If splats appear too compressed/flat:
+1. **Increase `focalAdjustment`** (try 1.5-2.0) to expand depth
+2. **Increase `maxStdDev`** for larger, softer splats
+
+### Implementation Details
+
+**Location:** `src/lib/splatRenderer.ts`
+
+```typescript
+// RendererSettings interface
+export interface RendererSettings {
+    focalAdjustment?: number;  // Default: 1.0
+    maxStdDev?: number;        // Default: √8 ≈ 2.83
+    blurAmount?: number;       // Default: 0
+    falloff?: number;          // Default: 1.0
+}
+
+// SparkRenderer is configured with these settings
+this.sparkRenderer = new SparkRenderer({
+    renderer: this.renderer,
+    focalAdjustment: settings.focalAdjustment,
+    maxStdDev: settings.maxStdDev,
+    blurAmount: settings.blurAmount,
+    falloff: settings.falloff,
+});
+```
+
+**State Management:** Settings are stored in `useSettingsStore` (Zustand) with localStorage persistence:
+- `rendererSettings` - Current settings object
+- `updateRendererSetting(key, value)` - Update single setting
+- `resetRenderer()` - Reset to defaults
+
+**Runtime Updates:** Settings can be changed at runtime via `viewer.updateRendererSettings(settings)` - sliders in the Settings panel update immediately without recreating the viewer.
+
+### Settings Panel Behavior
+
+The Settings panel is now **always visible** (not just in head tracking mode):
+- **In Head Tracking mode**: Shows all settings (presets, axis controls, motion, offsets, smoothing, rendering)
+- **In Orbit mode**: Shows only rendering settings (focalAdjustment, maxStdDev, blurAmount, falloff)
+
+This allows users to adjust rendering quality regardless of control mode.
 
 ---
 

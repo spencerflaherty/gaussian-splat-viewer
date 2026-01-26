@@ -14,6 +14,28 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
 
+/**
+ * Spark Renderer Settings
+ * These control how splats are rendered and can affect perceived depth/size.
+ */
+export interface RendererSettings {
+    /** Focal length adjustment. 1.0 = default, 2.0 = match PlayCanvas renderer. Default: 1.0 */
+    focalAdjustment?: number;
+    /** Maximum standard deviation for splat size. Default: √8 ≈ 2.83 */
+    maxStdDev?: number;
+    /** Blur amount for anti-aliasing. Typical: 0.3. Default: 0 */
+    blurAmount?: number;
+    /** Splat falloff curve. 0 = flat, 1 = normal gaussian kernel. Default: 1 */
+    falloff?: number;
+}
+
+export const DEFAULT_RENDERER_SETTINGS: RendererSettings = {
+    focalAdjustment: 1.0,
+    maxStdDev: Math.sqrt(8),  // ≈ 2.83, Spark default
+    blurAmount: 0,
+    falloff: 1.0,
+};
+
 export interface ViewerOptions {
     /** Container element to render into */
     rootElement: HTMLElement;
@@ -27,6 +49,8 @@ export interface ViewerOptions {
     useBuiltInControls?: boolean;
     /** Enable antialiasing (default: false for performance) */
     antialiased?: boolean;
+    /** Spark renderer settings */
+    rendererSettings?: RendererSettings;
 }
 
 export interface SceneOptions {
@@ -85,11 +109,22 @@ export class SplatViewer {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.container.appendChild(this.renderer.domElement);
 
-        // Create SparkRenderer and add to scene
+        // Merge renderer settings with defaults
+        const settings = { ...DEFAULT_RENDERER_SETTINGS, ...options.rendererSettings };
+
+        // Create SparkRenderer with settings
         this.sparkRenderer = new SparkRenderer({
             renderer: this.renderer,
+            focalAdjustment: settings.focalAdjustment,
+            maxStdDev: settings.maxStdDev,
+            blurAmount: settings.blurAmount,
+            falloff: settings.falloff,
         });
         this.scene.add(this.sparkRenderer);
+
+        if (import.meta.env.DEV) {
+            console.log('[SplatViewer] SparkRenderer settings:', settings);
+        }
 
         // Set initial look-at target
         if (options.initialCameraLookAt) {
@@ -257,6 +292,39 @@ export class SplatViewer {
             return this._splatMesh.packedSplats.numSplats;
         }
         return 0;
+    }
+
+    /**
+     * Update renderer settings at runtime
+     * Note: Some settings may require re-rendering to take effect
+     */
+    updateRendererSettings(settings: Partial<RendererSettings>): void {
+        if (this.disposed) return;
+
+        // SparkRenderer exposes these as properties
+        const spark = this.sparkRenderer as unknown as {
+            focalAdjustment?: number;
+            maxStdDev?: number;
+            blurAmount?: number;
+            falloff?: number;
+        };
+
+        if (settings.focalAdjustment !== undefined && 'focalAdjustment' in spark) {
+            spark.focalAdjustment = settings.focalAdjustment;
+        }
+        if (settings.maxStdDev !== undefined && 'maxStdDev' in spark) {
+            spark.maxStdDev = settings.maxStdDev;
+        }
+        if (settings.blurAmount !== undefined && 'blurAmount' in spark) {
+            spark.blurAmount = settings.blurAmount;
+        }
+        if (settings.falloff !== undefined && 'falloff' in spark) {
+            spark.falloff = settings.falloff;
+        }
+
+        if (import.meta.env.DEV) {
+            console.log('[SplatViewer] Updated renderer settings:', settings);
+        }
     }
 
     private animate = (): void => {

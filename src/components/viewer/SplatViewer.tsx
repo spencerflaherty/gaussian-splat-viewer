@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { SplatViewer as SplatViewerLib, SceneFormat } from '../../lib/splatRenderer';
+import type { RendererSettings } from '../../lib/splatRenderer';
 import type { SmoothedHeadPosition } from '../../hooks/useHeadTracking';
 import { LoadingOverlay } from './LoadingOverlay';
 import { ErrorOverlay } from './ErrorOverlay';
@@ -77,6 +78,8 @@ interface SplatViewerProps {
     headPosition: React.MutableRefObject<SmoothedHeadPosition>;
     controlMode: 'head' | 'orbit';
     headTrackingParams?: HeadTrackingParams;
+    /** Spark renderer settings (focalAdjustment, maxStdDev, etc.) */
+    rendererSettings?: RendererSettings;
     onError?: (error: string) => void;
     onLoaded?: () => void;
     /** Callback to get the centerView function */
@@ -124,8 +127,10 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };
 
-export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate }: SplatViewerProps) {
+export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, rendererSettings, onError, onLoaded, onCenterViewReady, onCameraPositionUpdate }: SplatViewerProps) {
     const params = headTrackingParams ?? DEFAULT_HEAD_TRACKING_PARAMS;
+    // Track renderer settings in ref for dynamic updates
+    const rendererSettingsRef = useRef(rendererSettings);
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<SplatViewerLib | null>(null);
     const animationRef = useRef<number | null>(null);
@@ -201,6 +206,7 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
                 initialCameraLookAt: [params.cameraX, params.cameraY, params.focusDepth],
                 useBuiltInControls: true,
                 antialiased: false, // Better performance with Spark
+                rendererSettings: rendererSettings,
             });
 
             viewerRef.current = viewer;
@@ -598,6 +604,18 @@ export function SplatViewer({ url, format, headPosition, controlMode, headTracki
         };
     // Note: params removed from deps - we use paramsRef.current inside RAF for immediate updates
     }, [controlMode, loading, headPosition]);
+
+    // Update renderer settings when they change
+    useEffect(() => {
+        if (!viewerRef.current || loading) return;
+        if (!rendererSettings) return;
+
+        // Update ref
+        rendererSettingsRef.current = rendererSettings;
+
+        // Apply to viewer
+        viewerRef.current.updateRendererSettings(rendererSettings);
+    }, [rendererSettings, loading]);
 
     // Camera position reporting for orbit mode
     useEffect(() => {

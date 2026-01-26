@@ -22,6 +22,7 @@ const BACKEND_URL = 'http://127.0.0.1:8000';
 function App() {
   // Settings store
   const params = useSettingsStore((s) => s.params);
+  const rendererSettings = useSettingsStore((s) => s.rendererSettings);
 
   // Viewer store
   const {
@@ -259,6 +260,7 @@ function App() {
             headPosition={positionRef}
             controlMode={controlMode}
             headTrackingParams={params}
+            rendererSettings={rendererSettings}
             onLoaded={handleSplatLoaded}
             onError={handleSplatError}
             onCenterViewReady={(fn) => { centerViewRef.current = fn; }}
