@@ -22,28 +22,41 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
     exit 1
 fi
 
-# Check Python version
+# Find Python 3.10+
 echo "Checking Python version..."
-if command -v python3 &> /dev/null; then
+PYTHON_CMD=""
+
+# Check Homebrew Python versions (prefer newer)
+for version in 3.13 3.12 3.11 3.10; do
+    if [ -x "/opt/homebrew/opt/python@$version/bin/python$version" ]; then
+        PYTHON_CMD="/opt/homebrew/opt/python@$version/bin/python$version"
+        break
+    elif [ -x "/usr/local/opt/python@$version/bin/python$version" ]; then
+        PYTHON_CMD="/usr/local/opt/python@$version/bin/python$version"
+        break
+    fi
+done
+
+# Fall back to system python3 if new enough
+if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
     PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
-
-    if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]); then
-        echo -e "${RED}Error: Python 3.10 or higher is required (found $PYTHON_VERSION).${NC}"
-        echo ""
-        echo "Install Python 3.13 via Homebrew:"
-        echo "  brew install python@3.13"
-        exit 1
+    if [ "$PYTHON_MAJOR" -ge 3 ] && [ "$PYTHON_MINOR" -ge 10 ]; then
+        PYTHON_CMD="python3"
     fi
-    echo -e "${GREEN}Found Python $PYTHON_VERSION${NC}"
-else
-    echo -e "${RED}Error: Python 3 is not installed.${NC}"
+fi
+
+if [ -z "$PYTHON_CMD" ]; then
+    echo -e "${RED}Error: Python 3.10 or higher is required.${NC}"
     echo ""
-    echo "Install Python via Homebrew:"
+    echo "Install Python 3.13 via Homebrew:"
     echo "  brew install python@3.13"
     exit 1
 fi
+
+PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo -e "${GREEN}Found Python $PYTHON_VERSION at $PYTHON_CMD${NC}"
 
 # Set up installation directory
 INSTALL_DIR="$HOME/.splat-window"
@@ -75,7 +88,7 @@ git submodule update --init --recursive
 # Create virtual environment
 echo ""
 echo "Creating Python virtual environment..."
-python3 -m venv .venv
+$PYTHON_CMD -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies
