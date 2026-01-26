@@ -112,7 +112,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     focusDepth: 0,           // Not used in new approach but kept for compatibility
 
     // Depth tracking
-    depthSensitivity: 0.05,  // Very subtle zoom effect (calibrated)
+    depthSensitivity: 0.03,  // Subtle zoom effect (calibrated Jan 2025)
 
     // Smoothing
     smoothing: 0.15,         // Lower = smoother but more latency
@@ -124,7 +124,7 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     enableZ: true,           // Depth/zoom tracking
 
     // Axis inversion - calibrated for natural movement
-    invertX: true,           // Flip X axis (calibrated)
+    invertX: false,          // No X flip needed (calibrated Jan 2025)
     invertY: false,          // Move head up -> camera moves up -> see bottom
     invertZ: false,          // Move closer -> camera moves closer -> zoom in
 };

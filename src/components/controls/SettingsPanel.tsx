@@ -26,31 +26,11 @@ const SLIDER_CONFIG: Record<string, {
     description: 'How much camera moves in response to your head movement. Higher = more parallax effect.',
   },
   depthSensitivity: {
-    min: 0, max: 0.1, step: 0.005,
+    min: 0, max: 0.06, step: 0.005,
     label: 'Zoom Effect',
     minLabel: 'Off', maxLabel: 'Strong',
-    defaultValue: 0.05,
+    defaultValue: 0.03,
     description: 'Camera zooms in/out as you move closer/farther from screen. Based on face width detection.',
-  },
-
-  // Camera offsets - ranges centered around defaults
-  cameraX: {
-    min: -0.4, max: 0.6, step: 0.01,
-    label: 'X Offset',
-    defaultValue: 0.10,
-    description: 'Shifts the scene left or right. Use to center objects that appear off to one side.',
-  },
-  cameraY: {
-    min: -0.5, max: 0.5, step: 0.01,
-    label: 'Y Offset',
-    defaultValue: 0,
-    description: 'Shifts the scene up or down. Use to center objects that appear too high or low.',
-  },
-  cameraZ: {
-    min: -1.0, max: 0, step: 0.01,
-    label: 'Z Offset',
-    defaultValue: -0.50,
-    description: 'Moves camera closer or farther from scene. Negative values pull camera back.',
   },
 
   // Smoothing - ranges centered around defaults
@@ -142,7 +122,6 @@ export function SettingsPanel({
   // Get settings from store
   const params = useSettingsStore((s) => s.params);
   const updateParam = useSettingsStore((s) => s.updateParam);
-  const applyPreset = useSettingsStore((s) => s.applyPreset);
   const reset = useSettingsStore((s) => s.reset);
 
   // Renderer settings from store
@@ -260,38 +239,6 @@ export function SettingsPanel({
             className="settings-scroll"
             style={{ padding: 16, overflowY: 'auto', flex: 1, maxHeight: 'calc(100vh - 250px)' }}
           >
-            {/* Presets - Only show in head tracking mode */}
-            {isHeadTrackingMode && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                  Presets
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {(['subtle', 'natural', 'dramatic'] as const).map((preset) => (
-                    <button
-                      key={preset}
-                      onClick={() => applyPreset(preset)}
-                      style={{
-                        flex: 1,
-                        padding: '10px 8px',
-                        borderRadius: 10,
-                        border: 'none',
-                        background: 'rgba(0, 122, 255, 0.1)',
-                        color: '#007AFF',
-                        cursor: 'pointer',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        textTransform: 'capitalize',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Head Tracking Settings - Only show in head tracking mode */}
             {isHeadTrackingMode && (
               <>
@@ -363,19 +310,6 @@ export function SettingsPanel({
                   </div>
                   {renderSlider('sensitivity' as NumericParams)}
                   {renderSlider('depthSensitivity' as NumericParams)}
-                </div>
-
-                {/* Offset Section */}
-                <div style={{ borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16, marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
-                    Offset Adjustments
-                  </div>
-                  <p style={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.4)', marginBottom: 10 }}>
-                    Fine-tune the camera position relative to your head
-                  </p>
-                  {renderSlider('cameraX' as NumericParams)}
-                  {renderSlider('cameraY' as NumericParams)}
-                  {renderSlider('cameraZ' as NumericParams)}
                 </div>
 
                 {/* Smoothing Section */}

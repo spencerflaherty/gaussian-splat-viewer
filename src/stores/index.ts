@@ -1,5 +1,4 @@
-export { useSettingsStore, PRESETS } from './settingsStore';
-export type { PresetName } from './settingsStore';
+export { useSettingsStore } from './settingsStore';
 
 // Re-export renderer settings types from lib for convenience
 export { DEFAULT_RENDERER_SETTINGS } from '../lib/splatRenderer';

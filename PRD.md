@@ -1,7 +1,7 @@
 # Product Requirements Document
 ## Splat Window: Gaussian Splat Viewer with Head Tracking
 
-**Version:** 2.2 (Camera Controls & UX Improvements)
+**Version:** 2.3 (Simplified Settings & Camera Controls)
 **Author:** Critical Architecture Review
 **Date:** January 2025
 **Status:** Implementation Complete (Core Features)
@@ -610,12 +610,14 @@ interface ViewerStore {
 ```
 
 **Key Changes:**
-1. Presets first - most users never need advanced settings
-2. Semantic labels - "Subtle" to "Dramatic" instead of numbers
-3. Actual values shown - no more offset confusion
-4. Auto-save - changes persist immediately, no save button
-5. Calibration button - explicit action with visual feedback
-6. Info tooltips - `?` button on each slider explains what the parameter does
+1. Semantic labels - "Subtle" to "Dramatic" instead of numbers
+2. Actual values shown - no more offset confusion
+3. Auto-save - changes persist immediately, no save button
+4. Calibration button - explicit action with visual feedback
+5. Info tooltips - `?` button on each slider explains what the parameter does
+6. Direct camera controls - Camera Position box (top-right) with editable inputs and up/down ticker buttons
+7. Removed offset sliders - replaced by direct camera position control
+8. Removed presets - simplified to just show the controls that matter
 
 ### 4.5 Animation Export with Advanced Easing
 
@@ -821,6 +823,7 @@ interface AnimationConfig {
 | 2.0 | Jan 2025 | Claude | Implementation complete for core features |
 | 2.1 | Jan 2025 | Claude | Updated status for all sections, consolidated with CLAUDE.md |
 | 2.2 | Jan 2025 | Claude | Added slider info tooltips, editable camera controls, PLY camera fix, zoom effect fix |
+| 2.3 | Jan 2025 | Claude | Simplified settings: removed presets and offset sliders, added up/down ticker buttons to camera inputs |
 
 ---
 

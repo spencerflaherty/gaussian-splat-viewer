@@ -324,14 +324,16 @@ Sliders show **real values** with ranges designed so **defaults sit at ~50%** (t
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
 | `sensitivity` | **0.01** | 0 - 0.02 | Movement scale. Default at 50% of range |
-| `depthSensitivity` | **0.05** | 0 - 0.1 | Zoom effect strength. Default at 50% |
+| `depthSensitivity` | **0.03** | 0 - 0.06 | Zoom effect strength. Default at 50% |
 
-#### Camera Offsets
-| Parameter | Default | Range | Description |
-|-----------|---------|-------|-------------|
-| `cameraX` | **0.10** | -0.4 to 0.6 | X offset for scene centering. Default at 50% |
-| `cameraY` | **0** | -0.5 to 0.5 | Y offset for scene centering. Default at 50% |
-| `cameraZ` | **-0.50** | -1.0 to 0 | Z offset (pull camera back). Default at 50% |
+#### Internal Camera Offsets (not exposed in UI)
+Camera offsets are kept internally but removed from the Settings panel. Use the Camera Position Control Box (top-right) for direct camera control instead.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `cameraX` | 0.10 | Internal X offset |
+| `cameraY` | 0 | Internal Y offset |
+| `cameraZ` | -0.50 | Internal Z offset |
 
 #### Smoothing
 | Parameter | Default | Range | Description |
@@ -353,15 +355,15 @@ Sliders show **real values** with ranges designed so **defaults sit at ~50%** (t
 | `enableX` | true | Enable/disable X-axis (left/right) tracking |
 | `enableY` | true | Enable/disable Y-axis (up/down) tracking |
 | `enableZ` | true | Enable/disable Z-axis (depth) tracking |
-| `invertX` | **true** | Flip X-axis direction (calibrated default) |
-| `invertY` | **true** | Flip Y-axis direction (calibrated default) |
+| `invertX` | false | Flip X-axis direction |
+| `invertY` | false | Flip Y-axis direction |
 | `invertZ` | false | Flip Z-axis direction |
 
 The UI provides toggle buttons for each axis:
 - **Enable buttons** (blue when active): Turn tracking on/off for each axis
 - **Flip buttons** (orange when active): Invert the direction of each axis
 
-**Note:** X and Y axes are flipped by default based on user testing to provide intuitive movement.
+**Note:** All axes are un-flipped by default (calibrated January 2025).
 
 ### Sensitivity Explained
 

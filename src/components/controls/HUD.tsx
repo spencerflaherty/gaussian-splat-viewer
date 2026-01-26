@@ -38,6 +38,33 @@ function EditableNumberInput({
     }
   };
 
+  const increment = () => {
+    const newVal = (parseFloat(localValue) || 0) + step;
+    setLocalValue(newVal.toFixed(2));
+    onChange(newVal);
+  };
+
+  const decrement = () => {
+    const newVal = (parseFloat(localValue) || 0) - step;
+    setLocalValue(newVal.toFixed(2));
+    onChange(newVal);
+  };
+
+  const tickerBtnStyle = {
+    width: 20,
+    height: 14,
+    padding: 0,
+    border: 'none',
+    background: 'rgba(0, 0, 0, 0.04)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'rgba(0, 0, 0, 0.4)',
+    fontSize: 8,
+    transition: 'background 0.15s ease',
+  };
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
       <span style={{ color: 'rgba(0, 0, 0, 0.5)', width: 20 }}>{label}:</span>
@@ -64,25 +91,50 @@ function EditableNumberInput({
           // Arrow key increment/decrement
           if (e.key === 'ArrowUp') {
             e.preventDefault();
-            const newVal = (parseFloat(localValue) || 0) + step;
-            setLocalValue(newVal.toFixed(2));
-            onChange(newVal);
+            increment();
           }
           if (e.key === 'ArrowDown') {
             e.preventDefault();
-            const newVal = (parseFloat(localValue) || 0) - step;
-            setLocalValue(newVal.toFixed(2));
-            onChange(newVal);
+            decrement();
           }
         }}
         style={{
           flex: 1, marginLeft: 8, padding: '4px 8px', fontSize: 12, fontFamily: 'SF Mono, monospace',
           border: isFocused ? '1px solid #007AFF' : '1px solid rgba(0,0,0,0.15)',
-          borderRadius: 4, background: 'rgba(255,255,255,0.9)',
-          outline: 'none', width: 90,
+          borderRadius: '4px 0 0 4px', background: 'rgba(255,255,255,0.9)',
+          outline: 'none', width: 70,
           boxShadow: isFocused ? '0 0 0 2px rgba(0,122,255,0.2)' : 'none',
         }}
       />
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: '0 4px 4px 0',
+        overflow: 'hidden',
+        border: '1px solid rgba(0,0,0,0.15)',
+        borderLeft: 'none',
+      }}>
+        <button
+          onClick={increment}
+          style={{ ...tickerBtnStyle, borderRadius: '0 4px 0 0' }}
+          tabIndex={-1}
+          title={`+${step}`}
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
+            <path d="M4 2L7 5H1L4 2Z" />
+          </svg>
+        </button>
+        <button
+          onClick={decrement}
+          style={{ ...tickerBtnStyle, borderRadius: '0 0 4px 0', borderTop: '1px solid rgba(0,0,0,0.1)' }}
+          tabIndex={-1}
+          title={`-${step}`}
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
+            <path d="M4 6L1 3H7L4 6Z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
