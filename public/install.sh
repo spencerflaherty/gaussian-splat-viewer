@@ -63,7 +63,7 @@ if [ -d "$INSTALL_DIR/repo" ]; then
 else
     echo ""
     echo "Cloning Splat Window repository..."
-    git clone --depth 1 https://github.com/yourusername/gaussian-splat-viewer.git "$INSTALL_DIR/repo"
+    git clone --depth 1 https://github.com/spencerflaherty/gaussian-splat-viewer.git "$INSTALL_DIR/repo"
     cd "$INSTALL_DIR/repo"
 fi
 

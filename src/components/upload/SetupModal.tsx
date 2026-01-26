@@ -8,7 +8,7 @@ export interface SetupModalProps {
   onClose: () => void;
 }
 
-const INSTALL_COMMAND = 'curl -fsSL https://your-domain.vercel.app/install.sh | bash';
+const INSTALL_COMMAND = 'curl -fsSL https://gaussian-splat-viewer-iota.vercel.app/install.sh | bash';
 
 /**
  * SetupModal - Shows installation instructions when backend is offline
