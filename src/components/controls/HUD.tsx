@@ -1,7 +1,5 @@
-import type { Dispatch, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import { LiquidGlass } from '../ui/LiquidGlass';
-import type { HeadTrackingParams } from '../viewer/SplatViewer';
 import { ModeSwitcher } from './ModeSwitcher';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -14,13 +12,8 @@ export interface HUDOverlayProps {
   handleExit: () => void;
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
-  headTrackingParams: HeadTrackingParams;
-  setHeadTrackingParams: Dispatch<SetStateAction<HeadTrackingParams>>;
-  settingsSaved: boolean;
-  setSettingsSaved: (saved: boolean) => void;
   darkBackground: boolean;
   setDarkBackground: (dark: boolean) => void;
-  onSaveSettings: () => void;
 }
 
 /**
@@ -40,13 +33,8 @@ export function HUDOverlay({
   handleExit,
   showSettings,
   setShowSettings,
-  headTrackingParams,
-  setHeadTrackingParams,
-  settingsSaved,
-  setSettingsSaved,
   darkBackground,
   setDarkBackground,
-  onSaveSettings,
 }: HUDOverlayProps) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 999999, pointerEvents: 'none' }}>
@@ -159,11 +147,6 @@ export function HUDOverlay({
           visible={showControls}
           showSettings={showSettings}
           setShowSettings={setShowSettings}
-          headTrackingParams={headTrackingParams}
-          setHeadTrackingParams={setHeadTrackingParams}
-          settingsSaved={settingsSaved}
-          setSettingsSaved={setSettingsSaved}
-          onSaveSettings={onSaveSettings}
         />
       )}
     </div>,

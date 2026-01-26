@@ -1,8 +1,7 @@
-import type { Dispatch, SetStateAction } from 'react';
 import { LiquidGlass } from '../ui/LiquidGlass';
 import { Slider } from '../ui/Slider';
+import { useSettingsStore } from '../../stores';
 import type { HeadTrackingParams } from '../viewer/SplatViewer';
-import { DEFAULT_HEAD_TRACKING_PARAMS } from '../viewer/SplatViewer';
 
 // Slider configuration with actual min/max values
 const SLIDER_CONFIG: Record<string, { min: number; max: number; step: number; label: string }> = {
@@ -26,40 +25,31 @@ export interface SettingsPanelProps {
   visible: boolean;
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
-  headTrackingParams: HeadTrackingParams;
-  setHeadTrackingParams: Dispatch<SetStateAction<HeadTrackingParams>>;
-  settingsSaved: boolean;
-  setSettingsSaved: (saved: boolean) => void;
-  onSaveSettings: () => void;
 }
 
 /**
  * Settings Panel - Collapsible sidebar for head tracking parameters
  *
- * Contains:
- * - Axis toggles (X, Y, Z enable/invert)
- * - Motion sliders (sensitivity, distance, depth)
- * - View sliders (screen size, vertical offset, focus)
- * - Camera offset sliders
- * - Smoothing sliders
- * - Save/Reset buttons
+ * Now uses Zustand store for settings with automatic persistence.
+ * No manual "Save" button needed - changes are saved automatically.
  */
 export function SettingsPanel({
   visible,
   showSettings,
   setShowSettings,
-  headTrackingParams,
-  setHeadTrackingParams,
-  settingsSaved,
-  setSettingsSaved,
-  onSaveSettings,
 }: SettingsPanelProps) {
+  // Get settings from store
+  const params = useSettingsStore((s) => s.params);
+  const updateParam = useSettingsStore((s) => s.updateParam);
+  const applyPreset = useSettingsStore((s) => s.applyPreset);
+  const reset = useSettingsStore((s) => s.reset);
+
   // Helper function to render a slider for a parameter
   const renderSlider = (param: NumericParams) => {
     const config = SLIDER_CONFIG[param];
     if (!config) return null;
 
-    const value = headTrackingParams[param] as number;
+    const value = params[param] as number;
 
     return (
       <Slider
@@ -69,7 +59,7 @@ export function SettingsPanel({
         min={config.min}
         max={config.max}
         step={config.step}
-        onChange={(newValue) => setHeadTrackingParams(p => ({ ...p, [param]: newValue }))}
+        onChange={(newValue) => updateParam(param, newValue)}
       />
     );
   };
@@ -131,8 +121,38 @@ export function SettingsPanel({
 
         {showSettings && (
           <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
-            {/* Axis Toggles */}
+            {/* Presets */}
             <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
+                Presets
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['subtle', 'natural', 'dramatic'] as const).map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => applyPreset(preset)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 8px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: 'rgba(0, 122, 255, 0.1)',
+                      color: '#007AFF',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Axis Toggles */}
+            <div style={{ marginBottom: 20, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)', paddingTop: 16 }}>
               <div style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.4)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 12 }}>
                 Tracking Axes
               </div>
@@ -141,11 +161,11 @@ export function SettingsPanel({
                 {(['enableX', 'enableY', 'enableZ'] as const).map((axis) => {
                   const labels = { enableX: 'X', enableY: 'Y', enableZ: 'Z' };
                   const descriptions = { enableX: 'Left/Right', enableY: 'Up/Down', enableZ: 'Depth' };
-                  const isEnabled = headTrackingParams[axis];
+                  const isEnabled = params[axis];
                   return (
                     <button
                       key={axis}
-                      onClick={() => setHeadTrackingParams(p => ({ ...p, [axis]: !p[axis] }))}
+                      onClick={() => updateParam(axis, !params[axis])}
                       style={{
                         flex: 1,
                         padding: '10px 8px',
@@ -167,11 +187,11 @@ export function SettingsPanel({
               <div style={{ display: 'flex', gap: 8 }}>
                 {(['invertX', 'invertY', 'invertZ'] as const).map((axis) => {
                   const labels = { invertX: 'Flip X', invertY: 'Flip Y', invertZ: 'Flip Z' };
-                  const isInverted = headTrackingParams[axis];
+                  const isInverted = params[axis];
                   return (
                     <button
                       key={axis}
-                      onClick={() => setHeadTrackingParams(p => ({ ...p, [axis]: !p[axis] }))}
+                      onClick={() => updateParam(axis, !params[axis])}
                       style={{
                         flex: 1,
                         padding: '8px 6px',
@@ -231,35 +251,13 @@ export function SettingsPanel({
               {renderSlider('deadZone' as NumericParams)}
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: 8, paddingTop: 8, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)' }}>
+            {/* Reset Button */}
+            <div style={{ paddingTop: 8, borderTop: '0.5px solid rgba(0, 0, 0, 0.1)' }}>
               <button
-                onClick={() => {
-                  onSaveSettings();
-                  setSettingsSaved(true);
-                  setTimeout(() => setSettingsSaved(false), 2000);
-                }}
+                onClick={reset}
                 style={{
-                  flex: 1,
+                  width: '100%',
                   padding: 12,
-                  borderRadius: 10,
-                  border: 'none',
-                  background: settingsSaved
-                    ? 'linear-gradient(180deg, #34C759 0%, #30B350 100%)'
-                    : 'rgba(0, 122, 255, 0.9)',
-                  color: 'white',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {settingsSaved ? '✓ Saved' : 'Save'}
-              </button>
-              <button
-                onClick={() => setHeadTrackingParams(DEFAULT_HEAD_TRACKING_PARAMS)}
-                style={{
-                  padding: '12px 16px',
                   borderRadius: 10,
                   border: 'none',
                   background: 'rgba(0, 0, 0, 0.06)',
@@ -269,7 +267,7 @@ export function SettingsPanel({
                   cursor: 'pointer',
                 }}
               >
-                Reset
+                Reset to Defaults
               </button>
             </div>
           </div>

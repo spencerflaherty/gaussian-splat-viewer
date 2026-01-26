@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useHeadTracking } from './hooks/useHeadTracking';
-import { SplatViewer, DEFAULT_HEAD_TRACKING_PARAMS } from './components/viewer/SplatViewer';
+import { SplatViewer } from './components/viewer/SplatViewer';
 import { HUDOverlay } from './components/controls/HUD';
 import { DropZone } from './components/upload/DropZone';
-import type { HeadTrackingParams } from './components/viewer/SplatViewer';
-import type { BackendStatus } from './components/upload/DropZone';
+import { useSettingsStore, useViewerStore } from './stores';
 
-type ProcessingStage = 'idle' | 'uploading' | 'converting' | 'loading';
-
-const STAGE_INFO: Record<ProcessingStage, { label: string; progress: number }> = {
+const STAGE_INFO: Record<string, { label: string; progress: number }> = {
   idle: { label: '', progress: 0 },
   uploading: { label: 'Uploading...', progress: 10 },
   converting: { label: 'Converting to 3D...', progress: 40 },
@@ -16,47 +13,37 @@ const STAGE_INFO: Record<ProcessingStage, { label: string; progress: number }> =
 };
 
 const BACKEND_URL = 'http://127.0.0.1:8000';
-const STORAGE_KEY = 'splatWindowSettings_v7';
-
-function loadSavedSettings(): HeadTrackingParams {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      return { ...DEFAULT_HEAD_TRACKING_PARAMS, ...JSON.parse(saved) };
-    }
-  } catch (e) {
-    console.warn('[App] Failed to load saved settings:', e);
-  }
-  return DEFAULT_HEAD_TRACKING_PARAMS;
-}
-
-function saveSettings(params: HeadTrackingParams): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(params));
-  } catch (e) {
-    console.error('[App] Failed to save settings:', e);
-  }
-}
 
 function App() {
-  const [headTrackingParams, setHeadTrackingParams] = useState<HeadTrackingParams>(loadSavedSettings);
-  const { positionRef, videoRef } = useHeadTracking(
-    headTrackingParams.smoothing,
-    headTrackingParams.deadZone
-  );
+  // Settings store
+  const params = useSettingsStore((s) => s.params);
 
-  const [splatUrl, setSplatUrl] = useState<string | null>(null);
-  const [splatFormat, setSplatFormat] = useState<'ply' | 'splat' | null>(null);
-  const [controlMode, setControlMode] = useState<'head' | 'orbit'>('orbit');
-  const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [backendStatus, setBackendStatus] = useState<BackendStatus>('checking');
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
-  const [darkBackground, setDarkBackground] = useState(true);
+  // Viewer store
+  const {
+    splatUrl,
+    splatFormat,
+    fileName,
+    controlMode,
+    processingStage,
+    error,
+    showControls,
+    showSettings,
+    darkBackground,
+    backendStatus,
+    setSplat,
+    setControlMode,
+    setProcessingStage,
+    setError,
+    setShowControls,
+    setShowSettings,
+    setDarkBackground,
+    setBackendStatus,
+    reset,
+  } = useViewerStore();
+
+  // Head tracking with params from settings store
+  const { positionRef, videoRef } = useHeadTracking(params.smoothing, params.deadZone);
+
   const hideControlsTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
@@ -77,7 +64,7 @@ function App() {
     checkBackend();
     const interval = setInterval(checkBackend, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [setBackendStatus]);
 
   // Auto-hide controls timer
   const resetControlsTimer = useCallback(() => {
@@ -86,7 +73,7 @@ function App() {
     hideControlsTimer.current = window.setTimeout(() => {
       if (splatUrl) setShowControls(false);
     }, 3000);
-  }, [splatUrl]);
+  }, [splatUrl, setShowControls]);
 
   useEffect(() => {
     if (splatUrl) {
@@ -102,15 +89,10 @@ function App() {
 
   // Exit handler
   const handleExit = useCallback(() => {
-    if (splatUrl?.startsWith('blob:')) URL.revokeObjectURL(splatUrl);
-    setSplatUrl(null);
-    setSplatFormat(null);
-    setError(null);
-    setFileName(null);
-    setProcessingStage('idle');
+    reset();
     setShowSettings(false);
     processingRef.current = false;
-  }, [splatUrl]);
+  }, [reset, setShowSettings]);
 
   // Escape key handler
   useEffect(() => {
@@ -126,18 +108,14 @@ function App() {
     if (processingRef.current || processingStage !== 'idle') return;
     processingRef.current = true;
 
-    setFileName(file.name);
-    if (splatUrl?.startsWith('blob:')) URL.revokeObjectURL(splatUrl);
     setError(null);
 
     if (file.name.endsWith('.splat')) {
       setProcessingStage('loading');
-      setSplatFormat('splat');
-      setSplatUrl(URL.createObjectURL(file));
+      setSplat(URL.createObjectURL(file), 'splat', file.name);
     } else if (file.name.endsWith('.ply')) {
       setProcessingStage('loading');
-      setSplatFormat('ply');
-      setSplatUrl(URL.createObjectURL(file));
+      setSplat(URL.createObjectURL(file), 'ply', file.name);
     } else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
       if (backendStatus !== 'online') {
         setError('Backend required. Run ./start.sh');
@@ -160,8 +138,7 @@ function App() {
         const blob = await response.blob();
         if (blob.size < 1000) throw new Error('Invalid response');
 
-        setSplatFormat('ply');
-        setSplatUrl(URL.createObjectURL(blob));
+        setSplat(URL.createObjectURL(blob), 'ply', file.name);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Conversion failed');
         setProcessingStage('idle');
@@ -174,6 +151,8 @@ function App() {
   };
 
   // Drag-and-drop handlers
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -185,15 +164,18 @@ function App() {
   const handleSplatLoaded = useCallback(() => {
     setProcessingStage('idle');
     processingRef.current = false;
-  }, []);
+  }, [setProcessingStage]);
 
-  const handleSplatError = useCallback((msg: string) => {
-    setError(msg);
-    setProcessingStage('idle');
-    processingRef.current = false;
-  }, []);
+  const handleSplatError = useCallback(
+    (msg: string) => {
+      setError(msg);
+      setProcessingStage('idle');
+      processingRef.current = false;
+    },
+    [setError, setProcessingStage]
+  );
 
-  const currentStage = STAGE_INFO[processingStage];
+  const currentStage = STAGE_INFO[processingStage] || STAGE_INFO.idle;
   const isProcessing = processingStage !== 'idle';
 
   // Determine background based on state
@@ -214,7 +196,10 @@ function App() {
         background: getBackground(),
         transition: 'background 0.5s ease',
       }}
-      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
     >
@@ -238,7 +223,7 @@ function App() {
             format={splatFormat}
             headPosition={positionRef}
             controlMode={controlMode}
-            headTrackingParams={headTrackingParams}
+            headTrackingParams={params}
             onLoaded={handleSplatLoaded}
             onError={handleSplatError}
           />
@@ -255,13 +240,8 @@ function App() {
           handleExit={handleExit}
           showSettings={showSettings}
           setShowSettings={setShowSettings}
-          headTrackingParams={headTrackingParams}
-          setHeadTrackingParams={setHeadTrackingParams}
-          settingsSaved={settingsSaved}
-          setSettingsSaved={setSettingsSaved}
           darkBackground={darkBackground}
           setDarkBackground={setDarkBackground}
-          onSaveSettings={() => saveSettings(headTrackingParams)}
         />
       )}
     </div>
