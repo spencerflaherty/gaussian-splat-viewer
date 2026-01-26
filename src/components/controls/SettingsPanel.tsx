@@ -1,8 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { LiquidGlass } from '../ui/LiquidGlass';
 import { Slider } from '../ui/Slider';
-import type { HeadTrackingParams } from '../SplatWindow';
-import { DEFAULT_HEAD_TRACKING_PARAMS } from '../SplatWindow';
+import type { HeadTrackingParams } from '../viewer/SplatViewer';
+import { DEFAULT_HEAD_TRACKING_PARAMS } from '../viewer/SplatViewer';
 
 // Slider configuration with actual min/max values
 const SLIDER_CONFIG: Record<string, { min: number; max: number; step: number; label: string }> = {

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { SplatViewer, SceneFormat } from '../lib/splatRenderer';
-import type { SmoothedHeadPosition } from '../hooks/useHeadTracking';
+import { SplatViewer as SplatViewerLib, SceneFormat } from '../../lib/splatRenderer';
+import type { SmoothedHeadPosition } from '../../hooks/useHeadTracking';
+import { LoadingOverlay } from './LoadingOverlay';
+import { ErrorOverlay } from './ErrorOverlay';
 
 /**
  * Head Tracking Parameters for the "Window into Virtual World" Effect
@@ -59,7 +61,7 @@ export interface HeadTrackingParams {
     invertZ: boolean;
 }
 
-interface SplatWindowProps {
+interface SplatViewerProps {
     url: string;
     format: 'ply' | 'splat' | null;
     headPosition: React.MutableRefObject<SmoothedHeadPosition>;
@@ -108,10 +110,10 @@ export const DEFAULT_HEAD_TRACKING_PARAMS: HeadTrackingParams = {
     invertZ: false,
 };
 
-export function SplatWindow({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded }: SplatWindowProps) {
+export function SplatViewer({ url, format, headPosition, controlMode, headTrackingParams, onError, onLoaded }: SplatViewerProps) {
     const params = headTrackingParams ?? DEFAULT_HEAD_TRACKING_PARAMS;
     const containerRef = useRef<HTMLDivElement>(null);
-    const viewerRef = useRef<SplatViewer | null>(null);
+    const viewerRef = useRef<SplatViewerLib | null>(null);
     const animationRef = useRef<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -170,7 +172,7 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
             const initialCamY = params.verticalOffset * params.screenSize + params.cameraY;
             const initialCamX = params.cameraX;
 
-            const viewer = new SplatViewer({
+            const viewer = new SplatViewerLib({
                 rootElement: containerRef.current,
                 cameraUp: [0, 1, 0],
                 initialCameraPosition: [initialCamX, initialCamY, initialCamZ],
@@ -566,44 +568,10 @@ export function SplatWindow({ url, format, headPosition, controlMode, headTracki
             />
 
             {/* Loading overlay */}
-            {loading && !loadError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <div className="glass-elevated rounded-2xl p-8 flex flex-col items-center">
-                        <div className="relative w-20 h-20 mb-4">
-                            <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-                            <div
-                                className="absolute inset-0 rounded-full border-2 border-transparent animate-spin"
-                                style={{
-                                    borderTopColor: '#3b82f6',
-                                    borderRightColor: '#8b5cf6',
-                                    animationDuration: '1s'
-                                }}
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-lg font-semibold text-gradient-blue">
-                                    {Math.round(loadProgress)}%
-                                </span>
-                            </div>
-                        </div>
-                        <div className="text-white/60 text-sm">Loading 3D Scene...</div>
-                    </div>
-                </div>
-            )}
+            {loading && !loadError && <LoadingOverlay progress={loadProgress} />}
 
             {/* Error overlay */}
-            {loadError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
-                    <div className="glass-error rounded-2xl p-8 max-w-md flex flex-col items-center">
-                        <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
-                            <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                        </div>
-                        <div className="text-xl font-medium text-white mb-2">Failed to Load</div>
-                        <div className="text-sm text-center text-red-300/80">{loadError}</div>
-                    </div>
-                </div>
-            )}
+            {loadError && <ErrorOverlay message={loadError} />}
         </div>
     );
 }

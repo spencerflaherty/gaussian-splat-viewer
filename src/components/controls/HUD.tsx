@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import { LiquidGlass } from '../ui/LiquidGlass';
-import type { HeadTrackingParams } from '../SplatWindow';
+import type { HeadTrackingParams } from '../viewer/SplatViewer';
 import { ModeSwitcher } from './ModeSwitcher';
 import { SettingsPanel } from './SettingsPanel';
 

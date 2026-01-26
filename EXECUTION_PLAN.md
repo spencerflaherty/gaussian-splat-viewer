@@ -80,56 +80,56 @@ Work through EXECUTION_PLAN.md systematically. Complete each task, validate it w
 **Validation:** N/A - component removed as unused ✅
 
 ### Task 1.4: Extract Slider Component
-- [ ] Create `src/components/ui/Slider.tsx`
-- [ ] Extract renderSlider logic from App.tsx
-- [ ] Make it a proper React component with props
-- [ ] Handle both slider and number input
-- [ ] Show ACTUAL values, not offsets
+- [x] Create `src/components/ui/Slider.tsx`
+- [x] Extract renderSlider logic from App.tsx
+- [x] Make it a proper React component with props
+- [x] Handle both slider and number input
+- [x] Show ACTUAL values, not offsets
 
-**Validation:** Sliders show real values (e.g., "2.5" not "0")
+**Validation:** Sliders show real values (e.g., "2.5" not "0") ✅
 
 ### Task 1.5: Extract HUDOverlay Component
-- [ ] Create `src/components/controls/HUD.tsx`
-- [ ] Move entire HUDOverlay function (~250 lines)
-- [ ] Keep all existing functionality
-- [ ] Convert inline styles to CSS
+- [x] Create `src/components/controls/HUD.tsx`
+- [x] Move entire HUDOverlay function (~250 lines)
+- [x] Keep all existing functionality
+- [ ] Convert inline styles to CSS (deferred to Phase 6)
 
-**Validation:** HUD appears, mode switching works, settings panel works
+**Validation:** HUD appears, mode switching works, settings panel works ✅
 
 ### Task 1.6: Extract ModeSwitcher Component
-- [ ] Create `src/components/controls/ModeSwitcher.tsx`
-- [ ] Extract the Head Track / Orbit pill from HUD
-- [ ] Make it a standalone component
+- [x] Create `src/components/controls/ModeSwitcher.tsx`
+- [x] Extract the Head Track / Orbit pill from HUD
+- [x] Make it a standalone component
 
-**Validation:** Mode switching still works
+**Validation:** Mode switching still works ✅
 
 ### Task 1.7: Extract SettingsPanel Component
-- [ ] Create `src/components/controls/SettingsPanel.tsx`
-- [ ] Extract settings panel from HUD
-- [ ] Include all slider sections
+- [x] Create `src/components/controls/SettingsPanel.tsx`
+- [x] Extract settings panel from HUD
+- [x] Include all slider sections
 
-**Validation:** All sliders work, values persist
+**Validation:** All sliders work, values persist ✅
 
 ### Task 1.8: Extract DropZone Component
-- [ ] Create `src/components/upload/DropZone.tsx`
-- [ ] Extract drag-and-drop and file input logic
-- [ ] Handle all file types (.splat, .ply, images)
+- [x] Create `src/components/upload/DropZone.tsx`
+- [x] Extract drag-and-drop and file input logic
+- [x] Handle all file types (.splat, .ply, images)
 
-**Validation:** Can drop files, click to upload
+**Validation:** Can drop files, click to upload ✅
 
 ### Task 1.9: Extract Loading/Error Overlays
-- [ ] Create `src/components/viewer/LoadingOverlay.tsx`
-- [ ] Create `src/components/viewer/ErrorOverlay.tsx`
-- [ ] Move from SplatWindow.tsx
+- [x] Create `src/components/viewer/LoadingOverlay.tsx`
+- [x] Create `src/components/viewer/ErrorOverlay.tsx`
+- [x] Move from SplatWindow.tsx
 
-**Validation:** Loading spinner shows, errors display
+**Validation:** Loading spinner shows, errors display ✅
 
 ### Task 1.10: Rename SplatWindow to SplatViewer
-- [ ] Rename `src/components/SplatWindow.tsx` to `src/components/viewer/SplatViewer.tsx`
-- [ ] Update all imports
-- [ ] Keep all projection/camera logic intact
+- [x] Rename `src/components/SplatWindow.tsx` to `src/components/viewer/SplatViewer.tsx`
+- [x] Update all imports
+- [x] Keep all projection/camera logic intact
 
-**Validation:** Viewer still works with head tracking
+**Validation:** Viewer still works with head tracking ✅
 
 ---
 
@@ -471,7 +471,7 @@ npm run dev
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
 | Phase 0: Library Migration | Complete | 2025-01-25 | 2025-01-25 |
-| Phase 1: Component Extraction | In Progress | 2025-01-25 | |
+| Phase 1: Component Extraction | Complete | 2025-01-25 | 2025-01-25 |
 | Phase 2: State Management | Not Started | | |
 | Phase 3: Settings UX | Not Started | | |
 | Phase 4: Performance | Not Started | | |

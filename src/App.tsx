@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useHeadTracking } from './hooks/useHeadTracking';
-import { SplatWindow, DEFAULT_HEAD_TRACKING_PARAMS } from './components/SplatWindow';
+import { SplatViewer, DEFAULT_HEAD_TRACKING_PARAMS } from './components/viewer/SplatViewer';
 import { HUDOverlay } from './components/controls/HUD';
 import { DropZone } from './components/upload/DropZone';
-import type { HeadTrackingParams } from './components/SplatWindow';
+import type { HeadTrackingParams } from './components/viewer/SplatViewer';
 import type { BackendStatus } from './components/upload/DropZone';
 
 type ProcessingStage = 'idle' | 'uploading' | 'converting' | 'loading';
@@ -233,7 +233,7 @@ function App() {
         />
       ) : (
         <div className="absolute inset-0">
-          <SplatWindow
+          <SplatViewer
             url={splatUrl}
             format={splatFormat}
             headPosition={positionRef}
